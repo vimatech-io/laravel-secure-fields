@@ -30,6 +30,9 @@ class RotateKeysCommand extends Command
 
     public function handle(): int
     {
+        $this->processed = 0;
+        $this->failed = 0;
+
         /** @var string $modelClass */
         $modelClass = $this->argument('model');
         /** @var string|null $oldKey */
@@ -84,9 +87,10 @@ class RotateKeysCommand extends Command
         $progressBar->start();
 
         $encryptor = app(Encryptor::class);
+        $primaryKey = $instance->getKeyName();
 
         $modelClass::query()
-            ->select(array_merge(['id'], $fields, $this->getHashColumns($instance, $fields)))
+            ->select(array_merge([$primaryKey], $fields))
             ->chunkById($chunkSize, function ($records) use ($encryptor, $fields, $oldKey, $dryRun, $progressBar) {
                 foreach ($records as $record) {
                     /** @var Model $record */
@@ -120,7 +124,7 @@ class RotateKeysCommand extends Command
 
                     $progressBar->advance();
                 }
-            });
+            }, $primaryKey);
 
         $progressBar->finish();
         $this->newLine(2);
@@ -161,24 +165,5 @@ class RotateKeysCommand extends Command
         }
 
         return $fields;
-    }
-
-    /**
-     * @param  array<string>  $fields
-     * @return array<string>
-     */
-    private function getHashColumns(Model $instance, array $fields): array
-    {
-        /** @var array<string> $searchable */
-        $searchable = $instance->secureSearchable ?? [];
-        $columns = [];
-
-        foreach ($fields as $field) {
-            if (in_array($field, $searchable)) {
-                $columns[] = $field.'_hash';
-            }
-        }
-
-        return $columns;
     }
 }

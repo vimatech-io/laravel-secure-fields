@@ -153,8 +153,6 @@ test('toSecureArray excludes all encrypted fields', function () {
     ]);
 
     $freshUser = TestUser::find($user->id);
-    // Make fields visible first for test
-    $freshUser->makeVisible(['email', 'phone']);
     $secureArray = $freshUser->toSecureArray();
 
     expect($secureArray)->not->toHaveKey('email');
@@ -168,7 +166,6 @@ test('toMaskedArray returns masked secure fields', function () {
     ]);
 
     $freshUser = TestUser::find($user->id);
-    $freshUser->makeVisible(['email', 'phone']);
     $masked = $freshUser->toMaskedArray();
 
     expect($masked['email'])->toContain('*');

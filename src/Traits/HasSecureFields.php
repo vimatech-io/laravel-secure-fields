@@ -20,24 +20,10 @@ trait HasSecureFields
 {
     use HasSearchableFields;
 
-    /**
-     * Stores original plaintext values before encryption.
-     *
-     * @var array<string, string>
-     */
-    protected array $secureFieldValues = [];
-
-    public static function bootHasSecureFields(): void
-    {
-        // Prevent double boot of HasSearchableFields
-    }
-
     public function initializeHasSecureFields(): void
     {
-        // Auto-hide encrypted fields from serialization
         $this->hidden = array_merge($this->hidden, $this->getSecureFields());
 
-        // Hide hash columns too
         foreach ($this->getSecureSearchableFields() as $field) {
             $this->hidden[] = $this->getSearchIndexColumn($field);
         }
@@ -122,13 +108,7 @@ trait HasSecureFields
      */
     public function toSecureArray(): array
     {
-        $array = $this->toArray();
-
-        foreach ($this->getSecureFields() as $field) {
-            unset($array[$field]);
-        }
-
-        return $array;
+        return (clone $this)->makeHidden($this->getSecureFields())->toArray();
     }
 
     /**
@@ -138,9 +118,10 @@ trait HasSecureFields
      */
     public function toMaskedArray(): array
     {
-        $array = $this->toArray();
+        $secureFields = $this->getSecureFields();
+        $array = (clone $this)->makeVisible($secureFields)->toArray();
 
-        foreach ($this->getSecureFields() as $field) {
+        foreach ($secureFields as $field) {
             if (isset($array[$field])) {
                 $array[$field] = $this->masked($field);
             }

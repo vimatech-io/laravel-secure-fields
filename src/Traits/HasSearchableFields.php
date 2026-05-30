@@ -13,9 +13,20 @@ use VimaTech\SecureFields\Contracts\HashEngine;
  * Define searchable fields in your model:
  *
  * protected array $secureSearchable = ['email', 'phone'];
+ *
+ * Note: this trait accesses $secureFieldValues which must be populated before
+ * save. HasSecureFields does this automatically via setAttribute(). When using
+ * this trait standalone you are responsible for populating $secureFieldValues.
  */
 trait HasSearchableFields
 {
+    /**
+     * Stores plaintext values captured before the encryption cast runs.
+     *
+     * @var array<string, string>
+     */
+    protected array $secureFieldValues = [];
+
     public static function bootHasSearchableFields(): void
     {
         static::saving(function ($model) {
@@ -59,16 +70,12 @@ trait HasSearchableFields
      */
     protected function getOriginalPlaintext(string $field): ?string
     {
-        // Access the raw attribute that was set (before cast processes it)
         $value = $this->attributes[$field] ?? null;
 
         if ($value === null) {
             return null;
         }
 
-        // If the field is about to be encrypted via cast, the raw set value
-        // is already encrypted. We need the value the user originally set.
-        // Check if we have it in the changes array.
         return $this->getOriginalSecureValue($field);
     }
 
@@ -93,7 +100,7 @@ trait HasSearchableFields
     /**
      * Get the hash index column name for a field.
      */
-    protected function getSearchIndexColumn(string $field): string
+    public function getSearchIndexColumn(string $field): string
     {
         return $field.'_hash';
     }

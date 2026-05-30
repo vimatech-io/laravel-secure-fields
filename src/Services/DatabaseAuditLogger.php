@@ -12,11 +12,28 @@ use VimaTech\SecureFields\Models\SecureFieldAuditLog;
 
 class DatabaseAuditLogger implements AuditLogger
 {
+    /**
+     * Tracks (model:id:field) pairs already logged in this request.
+     * Safe in FrankenPHP/Octane worker mode because this class is bound
+     * via scoped() and is recreated for each request.
+     *
+     * @var array<string, true>
+     */
+    private array $logged = [];
+
     public function logDecryption(Model $model, string $field, ?int $userId = null): void
     {
         if (! config('secure-fields.audit.enabled', false)) {
             return;
         }
+
+        $dedupKey = get_class($model).':'.$model->getKey().':'.$field;
+
+        if (isset($this->logged[$dedupKey])) {
+            return;
+        }
+
+        $this->logged[$dedupKey] = true;
 
         $userId = $userId ?? Auth::id();
 
@@ -27,8 +44,8 @@ class DatabaseAuditLogger implements AuditLogger
                 'field' => $field,
                 'user_id' => $userId,
                 'action' => 'decrypt',
-                'ip_address' => request()->ip(),
-                'user_agent' => request()->userAgent(),
+                'ip_address' => $this->resolveIpAddress(),
+                'user_agent' => $this->resolveUserAgent(),
             ]);
         } else {
             /** @var string $channel */
@@ -39,6 +56,7 @@ class DatabaseAuditLogger implements AuditLogger
                 'field' => $field,
                 'user_id' => $userId,
                 'action' => 'decrypt',
+                'ip_address' => $this->resolveIpAddress(),
             ]);
         }
     }
@@ -56,6 +74,8 @@ class DatabaseAuditLogger implements AuditLogger
                 'field' => '*',
                 'user_id' => Auth::id(),
                 'action' => 'key_rotation',
+                'ip_address' => $this->resolveIpAddress(),
+                'user_agent' => $this->resolveUserAgent(),
                 'metadata' => ['records_processed' => $recordsProcessed],
             ]);
         } else {
@@ -64,7 +84,34 @@ class DatabaseAuditLogger implements AuditLogger
             Log::channel($channel)->info('Key rotation completed', [
                 'model' => $model,
                 'records_processed' => $recordsProcessed,
+                'ip_address' => $this->resolveIpAddress(),
             ]);
+        }
+    }
+
+    private function resolveIpAddress(): ?string
+    {
+        if (app()->runningInConsole()) {
+            return null;
+        }
+
+        try {
+            return app('request')->ip();
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function resolveUserAgent(): ?string
+    {
+        if (app()->runningInConsole()) {
+            return null;
+        }
+
+        try {
+            return app('request')->userAgent();
+        } catch (\Throwable) {
+            return null;
         }
     }
 }

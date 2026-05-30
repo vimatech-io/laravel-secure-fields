@@ -6,6 +6,7 @@ namespace VimaTech\SecureFields\Casts;
 
 use Illuminate\Contracts\Database\Eloquent\CastsAttributes;
 use Illuminate\Database\Eloquent\Model;
+use VimaTech\SecureFields\Contracts\AuditLogger;
 use VimaTech\SecureFields\Contracts\Encryptor;
 
 /**
@@ -23,6 +24,7 @@ class SecureJson implements CastsAttributes
         }
 
         $decrypted = app(Encryptor::class)->decrypt($value);
+        app(AuditLogger::class)->logDecryption($model, $key);
 
         /** @var array<string, mixed> */
         return json_decode($decrypted, true, 512, JSON_THROW_ON_ERROR);

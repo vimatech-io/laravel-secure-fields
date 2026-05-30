@@ -32,7 +32,7 @@ class SecureFieldsServiceProvider extends ServiceProvider
             return new HmacHashEngine($key);
         });
 
-        $this->app->singleton(AuditLogger::class, DatabaseAuditLogger::class);
+        $this->app->scoped(AuditLogger::class, DatabaseAuditLogger::class);
 
         $this->app->singleton(SecureFieldsManager::class, function () {
             /** @var Encryptor $encryptor */
@@ -66,20 +66,11 @@ class SecureFieldsServiceProvider extends ServiceProvider
         /** @var string|null $key */
         $key = config('secure-fields.key');
 
-        if ($key) {
+        if (is_string($key) && $key !== '') {
             return $key;
         }
 
-        // Derive from APP_KEY
-        /** @var string $appKey */
-        $appKey = config('app.key');
-
-        if (str_starts_with($appKey, 'base64:')) {
-            $appKey = base64_decode(substr($appKey, 7));
-        }
-
-        // Derive a separate key using HKDF
-        $derived = hash_hkdf('sha256', $appKey, 32, 'secure-fields-encryption');
+        $derived = hash_hkdf('sha256', $this->decodeAppKey(), 32, 'secure-fields-encryption');
 
         return base64_encode($derived);
     }
@@ -89,19 +80,28 @@ class SecureFieldsServiceProvider extends ServiceProvider
         /** @var string|null $key */
         $key = config('secure-fields.hashing.key');
 
-        if ($key) {
+        if (is_string($key) && $key !== '') {
             return $key;
         }
 
-        // Derive from APP_KEY
+        return hash_hkdf('sha256', $this->decodeAppKey(), 32, 'secure-fields-hashing');
+    }
+
+    private function decodeAppKey(): string
+    {
         /** @var string $appKey */
         $appKey = config('app.key');
 
         if (str_starts_with($appKey, 'base64:')) {
-            $appKey = base64_decode(substr($appKey, 7));
+            $decoded = base64_decode(substr($appKey, 7), true);
+
+            if ($decoded === false) {
+                throw new \RuntimeException('APP_KEY contains an invalid base64-encoded value.');
+            }
+
+            return $decoded;
         }
 
-        // Derive a separate key for hashing using HKDF
-        return hash_hkdf('sha256', $appKey, 32, 'secure-fields-hashing');
+        return $appKey;
     }
 }

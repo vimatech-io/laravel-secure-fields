@@ -6,6 +6,7 @@ namespace VimaTech\SecureFields\Casts;
 
 use Illuminate\Contracts\Database\Eloquent\CastsAttributes;
 use Illuminate\Database\Eloquent\Model;
+use VimaTech\SecureFields\Contracts\AuditLogger;
 use VimaTech\SecureFields\Contracts\Encryptor;
 
 /**
@@ -19,7 +20,10 @@ class SecureField implements CastsAttributes
             return null;
         }
 
-        return app(Encryptor::class)->decrypt($value);
+        $decrypted = app(Encryptor::class)->decrypt($value);
+        app(AuditLogger::class)->logDecryption($model, $key);
+
+        return $decrypted;
     }
 
     public function set(Model $model, string $key, mixed $value, array $attributes): ?string
