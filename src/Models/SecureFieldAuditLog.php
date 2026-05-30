@@ -10,7 +10,16 @@ class SecureFieldAuditLog extends Model
 {
     protected $table = 'secure_field_audit_logs';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'model_type',
+        'model_id',
+        'field',
+        'user_id',
+        'action',
+        'ip_address',
+        'user_agent',
+        'metadata',
+    ];
 
     protected $casts = [
         'metadata' => 'array',
