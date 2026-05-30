@@ -6,10 +6,10 @@ parameters:
         - src
     level: max
     treatPhpDocTypesAsCertain: false
+    parallel:
+        maximumNumberOfProcesses: 1
     ignoreErrors:
         - '#Trait .+ is used zero times and is not analysed#'
         - '#Cannot cast mixed to (string|int)#'
-        - '#Cannot call method .+ on mixed#'
-        - '#Argument of an invalid type mixed supplied for foreach#'
         - '#Call to protected method getAttributeFromArray#'
         - '#Part .+ of encapsed string cannot be cast to string#'
