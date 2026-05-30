@@ -7,8 +7,10 @@ namespace VimaTech\SecureFields\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use VimaTech\SecureFields\Casts\SecureField;
 use VimaTech\SecureFields\Casts\SecureJson;
+use VimaTech\SecureFields\Contracts\AuditLogger;
 use VimaTech\SecureFields\Contracts\Encryptor;
 use VimaTech\SecureFields\Traits\HasSecureFields;
 
@@ -24,24 +26,24 @@ class RotateKeysCommand extends Command
 
     protected $description = 'Rotate encryption keys for secure model fields';
 
-    private int $processed = 0;
-
-    private int $failed = 0;
-
     public function handle(): int
     {
-        $this->processed = 0;
-        $this->failed = 0;
-
         /** @var string $modelClass */
         $modelClass = $this->argument('model');
         /** @var string|null $oldKey */
-        $oldKey = $this->option('old-key');
+        $oldKey = $this->option('old-key')
+            ?? $this->secret('Enter the old encryption key (base64):');
         $chunkSize = (int) $this->option('chunk');
         $dryRun = (bool) $this->option('dry-run');
 
         if (! is_string($modelClass) || ! class_exists($modelClass)) {
             $this->error("Model class [{$modelClass}] does not exist.");
+
+            return self::FAILURE;
+        }
+
+        if (! is_subclass_of($modelClass, Model::class)) {
+            $this->error("Model class [{$modelClass}] is not an Eloquent model.");
 
             return self::FAILURE;
         }
@@ -61,6 +63,10 @@ class RotateKeysCommand extends Command
         /** @var Model $instance */
         $instance = new $modelClass;
         $fields = $this->getFieldsToRotate($instance);
+
+        if ($fields === null) {
+            return self::FAILURE;
+        }
 
         if (empty($fields)) {
             $this->warn('No secure fields found to rotate.');
@@ -87,11 +93,16 @@ class RotateKeysCommand extends Command
         $progressBar->start();
 
         $encryptor = app(Encryptor::class);
+        $table = $instance->getTable();
         $primaryKey = $instance->getKeyName();
+        $processed = 0;
+        $failed = 0;
 
         $modelClass::query()
             ->select(array_merge([$primaryKey], $fields))
-            ->chunkById($chunkSize, function ($records) use ($encryptor, $fields, $oldKey, $dryRun, $progressBar) {
+            ->chunkById($chunkSize, function ($records) use ($encryptor, $fields, $oldKey, $dryRun, $progressBar, $table, $primaryKey, &$processed, &$failed) {
+                $chunkUpdates = [];
+
                 foreach ($records as $record) {
                     /** @var Model $record */
                     try {
@@ -105,24 +116,35 @@ class RotateKeysCommand extends Command
                                 continue;
                             }
 
-                            $newEncrypted = $encryptor->rotate($encryptedValue, $oldKey);
-                            $updates[$field] = $newEncrypted;
+                            $updates[$field] = $encryptor->rotate($encryptedValue, $oldKey);
                         }
 
-                        if (! empty($updates) && ! $dryRun) {
-                            DB::table($record->getTable())
-                                ->where($record->getKeyName(), $record->getKey())
-                                ->update($updates);
+                        if (! empty($updates)) {
+                            /** @var int|string $key */
+                            $key = $record->getKey();
+                            $chunkUpdates[$key] = $updates;
                         }
 
-                        $this->processed++;
+                        $processed++;
                     } catch (\Throwable $e) {
-                        $this->failed++;
+                        $failed++;
+                        Log::error('secure-fields: rotation failed for a record', [
+                            'table' => $table,
+                            'error' => $e->getMessage(),
+                        ]);
                         $this->newLine();
-                        $this->error("Failed to rotate record ID {$record->getKey()}: {$e->getMessage()}");
+                        $this->warn('A record failed to rotate — see application logs for details.');
                     }
 
                     $progressBar->advance();
+                }
+
+                if (! empty($chunkUpdates) && ! $dryRun) {
+                    DB::transaction(function () use ($chunkUpdates, $table, $primaryKey) {
+                        foreach ($chunkUpdates as $key => $updates) {
+                            DB::table($table)->where($primaryKey, $key)->update($updates);
+                        }
+                    });
                 }
             }, $primaryKey);
 
@@ -130,40 +152,56 @@ class RotateKeysCommand extends Command
         $this->newLine(2);
 
         $this->info('Key rotation complete.');
-        $this->info("Processed: {$this->processed}");
+        $this->info("Processed: {$processed}");
 
-        if ($this->failed > 0) {
-            $this->warn("Failed: {$this->failed}");
+        if ($failed > 0) {
+            $this->warn("Failed: {$failed}");
         }
 
         if ($dryRun) {
             $this->info('[DRY RUN] No changes were persisted.');
+        } else {
+            app(AuditLogger::class)->logRotation($modelClass, $processed);
         }
 
-        return $this->failed > 0 ? self::FAILURE : self::SUCCESS;
+        return $failed > 0 ? self::FAILURE : self::SUCCESS;
+    }
+
+    /**
+     * Returns the list of fields to rotate, or null if validation fails.
+     *
+     * @return array<string>|null
+     */
+    private function getFieldsToRotate(Model $instance): ?array
+    {
+        /** @var array<int, string> $specifiedFields */
+        $specifiedFields = array_values(array_filter((array) $this->option('fields')));
+        $validFields = $this->getValidSecureFields($instance);
+
+        if (! empty($specifiedFields)) {
+            $invalid = array_diff($specifiedFields, $validFields);
+
+            if (! empty($invalid)) {
+                $this->error('Fields are not SecureField or SecureJson casts: '.implode(', ', $invalid));
+
+                return null;
+            }
+
+            return $specifiedFields;
+        }
+
+        return $validFields;
     }
 
     /**
      * @return array<string>
      */
-    private function getFieldsToRotate(Model $instance): array
+    private function getValidSecureFields(Model $instance): array
     {
-        /** @var array<int, string> $specifiedFields */
-        $specifiedFields = array_filter((array) $this->option('fields'));
-
-        if (! empty($specifiedFields)) {
-            return $specifiedFields;
-        }
-
-        $fields = [];
-        foreach ($instance->getCasts() as $field => $cast) {
-            if (is_string($cast)
-                && (is_a($cast, SecureField::class, true)
-                || is_a($cast, SecureJson::class, true))) {
-                $fields[] = $field;
-            }
-        }
-
-        return $fields;
+        return array_keys(array_filter(
+            $instance->getCasts(),
+            fn (mixed $cast) => is_string($cast)
+                && (is_a($cast, SecureField::class, true) || is_a($cast, SecureJson::class, true))
+        ));
     }
 }
