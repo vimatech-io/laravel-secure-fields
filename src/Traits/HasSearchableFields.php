@@ -32,6 +32,10 @@ trait HasSearchableFields
         static::saving(function ($model) {
             $model->updateSearchIndexes();
         });
+
+        static::saved(function ($model) {
+            $model->secureFieldValues = [];
+        });
     }
 
     /**
@@ -51,16 +55,27 @@ trait HasSearchableFields
     protected function updateSearchIndexes(): void
     {
         $searchableFields = $this->getSecureSearchableFields();
+
+        if (empty($searchableFields)) {
+            return;
+        }
+
+        $dirtySearchable = array_filter(
+            $searchableFields,
+            fn (string $field) => $this->isDirty($field) || ! $this->exists
+        );
+
+        if (empty($dirtySearchable)) {
+            return;
+        }
+
         $hashEngine = app(HashEngine::class);
 
-        foreach ($searchableFields as $field) {
-            if ($this->isDirty($field) || ! $this->exists) {
-                $plaintext = $this->getOriginalPlaintext($field);
+        foreach ($dirtySearchable as $field) {
+            $plaintext = $this->getOriginalPlaintext($field);
 
-                if ($plaintext !== null) {
-                    $column = $this->getSearchIndexColumn($field);
-                    $this->attributes[$column] = $hashEngine->hash($plaintext);
-                }
+            if ($plaintext !== null) {
+                $this->attributes[$this->getSearchIndexColumn($field)] = $hashEngine->hash($plaintext);
             }
         }
     }

@@ -12,6 +12,16 @@ use VimaTech\SecureFields\Models\SecureFieldAuditLog;
 
 class DatabaseAuditLogger implements AuditLogger
 {
+    private bool $enabled;
+
+    private string $driver;
+
+    private string $channel;
+
+    private ?string $ipAddress;
+
+    private ?string $userAgent;
+
     /**
      * Tracks (model:id:field) pairs already logged in this request.
      * Safe in FrankenPHP/Octane worker mode because this class is bound
@@ -21,13 +31,36 @@ class DatabaseAuditLogger implements AuditLogger
      */
     private array $logged = [];
 
+    /**
+     * Pending database audit rows flushed in bulk on destruction.
+     *
+     * @var array<int, array<string, mixed>>
+     */
+    private array $pending = [];
+
+    public function __construct()
+    {
+        $this->enabled = (bool) config('secure-fields.audit.enabled', false);
+        $this->driver = (string) config('secure-fields.audit.driver', 'log');
+        $this->channel = (string) config('secure-fields.audit.log_channel', 'stack');
+        $this->ipAddress = $this->resolveIpAddress();
+        $this->userAgent = $this->resolveUserAgent();
+    }
+
+    public function __destruct()
+    {
+        $this->flush();
+    }
+
     public function logDecryption(Model $model, string $field, ?int $userId = null): void
     {
-        if (! config('secure-fields.audit.enabled', false)) {
+        if (! $this->enabled) {
             return;
         }
 
-        $dedupKey = get_class($model).':'.$model->getKey().':'.$field;
+        /** @var int|string $modelKey */
+        $modelKey = $model->getKey();
+        $dedupKey = get_class($model).':'.$modelKey.':'.$field;
 
         if (isset($this->logged[$dedupKey])) {
             return;
@@ -37,56 +70,71 @@ class DatabaseAuditLogger implements AuditLogger
 
         $userId = $userId ?? Auth::id();
 
-        if (config('secure-fields.audit.driver') === 'database') {
-            SecureFieldAuditLog::create([
+        if ($this->driver === 'database') {
+            $now = now()->toDateTimeString();
+            $this->pending[] = [
                 'model_type' => get_class($model),
                 'model_id' => $model->getKey(),
                 'field' => $field,
                 'user_id' => $userId,
                 'action' => 'decrypt',
-                'ip_address' => $this->resolveIpAddress(),
-                'user_agent' => $this->resolveUserAgent(),
-            ]);
+                'ip_address' => $this->ipAddress,
+                'user_agent' => $this->userAgent,
+                'metadata' => null,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
         } else {
-            /** @var string $channel */
-            $channel = config('secure-fields.audit.log_channel', 'stack');
-            Log::channel($channel)->info('Secure field accessed', [
+            Log::channel($this->channel)->info('Secure field accessed', [
                 'model' => get_class($model),
                 'model_id' => $model->getKey(),
                 'field' => $field,
                 'user_id' => $userId,
                 'action' => 'decrypt',
-                'ip_address' => $this->resolveIpAddress(),
+                'ip_address' => $this->ipAddress,
             ]);
         }
     }
 
     public function logRotation(string $model, int $recordsProcessed): void
     {
-        if (! config('secure-fields.audit.enabled', false)) {
+        if (! $this->enabled) {
             return;
         }
 
-        if (config('secure-fields.audit.driver') === 'database') {
+        if ($this->driver === 'database') {
             SecureFieldAuditLog::create([
                 'model_type' => $model,
                 'model_id' => null,
                 'field' => '*',
                 'user_id' => Auth::id(),
                 'action' => 'key_rotation',
-                'ip_address' => $this->resolveIpAddress(),
-                'user_agent' => $this->resolveUserAgent(),
+                'ip_address' => $this->ipAddress,
+                'user_agent' => $this->userAgent,
                 'metadata' => ['records_processed' => $recordsProcessed],
             ]);
         } else {
-            /** @var string $channel */
-            $channel = config('secure-fields.audit.log_channel', 'stack');
-            Log::channel($channel)->info('Key rotation completed', [
+            Log::channel($this->channel)->info('Key rotation completed', [
                 'model' => $model,
                 'records_processed' => $recordsProcessed,
-                'ip_address' => $this->resolveIpAddress(),
+                'ip_address' => $this->ipAddress,
             ]);
         }
+    }
+
+    private function flush(): void
+    {
+        if (empty($this->pending)) {
+            return;
+        }
+
+        try {
+            SecureFieldAuditLog::insert($this->pending);
+        } catch (\Throwable) {
+            // best-effort — audit failures must not crash the application
+        }
+
+        $this->pending = [];
     }
 
     private function resolveIpAddress(): ?string

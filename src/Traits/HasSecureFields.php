@@ -20,6 +20,13 @@ trait HasSecureFields
 {
     use HasSearchableFields;
 
+    /**
+     * Per-class cache of secure field names, computed once from $casts.
+     *
+     * @var array<string, array<string>>
+     */
+    private static array $secureFieldsCache = [];
+
     public function initializeHasSecureFields(): void
     {
         $this->hidden = array_merge($this->hidden, $this->getSecureFields());
@@ -62,35 +69,35 @@ trait HasSecureFields
             return str_repeat($maskChar, $length);
         }
 
-        $maskedLength = $length - $visibleEnd;
-        $visible = mb_substr($value, -$visibleEnd);
-
-        return str_repeat($maskChar, $maskedLength).$visible;
+        return str_repeat($maskChar, $length - $visibleEnd).mb_substr($value, -$visibleEnd);
     }
 
     /**
      * Get array of field names that are encrypted.
+     * Result is cached per class — casts are defined statically and never change at runtime.
      *
      * @return array<string>
      */
     protected function getSecureFields(): array
     {
-        $secureFields = [];
+        $class = static::class;
 
-        foreach ($this->getCasts() as $field => $cast) {
-            if (is_a($cast, SecureField::class, true)
-                || is_a($cast, SecureJson::class, true)) {
-                $secureFields[] = $field;
-            }
+        if (! array_key_exists($class, self::$secureFieldsCache)) {
+            self::$secureFieldsCache[$class] = array_keys(array_filter(
+                $this->getCasts(),
+                fn (string $cast) => is_a($cast, SecureField::class, true)
+                    || is_a($cast, SecureJson::class, true)
+            ));
         }
 
-        return $secureFields;
+        return self::$secureFieldsCache[$class];
     }
 
     /**
-     * Get decrypted value without triggering audit log (internal use).
+     * Get decrypted value without triggering audit log.
+     * Internal use only — do NOT expose this via public API or use in data exports.
      */
-    public function getSecureRawValue(string $field): ?string
+    protected function getSecureRawValue(string $field): ?string
     {
         $raw = $this->getAttributeFromArray($field);
 
@@ -121,10 +128,20 @@ trait HasSecureFields
         $secureFields = $this->getSecureFields();
         $array = (clone $this)->makeVisible($secureFields)->toArray();
 
+        $visibleEnd = (int) config('secure-fields.masking.visible_end', 4);
+        $maskChar = (string) config('secure-fields.masking.character', '*');
+
         foreach ($secureFields as $field) {
-            if (isset($array[$field])) {
-                $array[$field] = $this->masked($field);
+            if (! isset($array[$field])) {
+                continue;
             }
+
+            $value = (string) $array[$field];
+            $length = mb_strlen($value);
+
+            $array[$field] = $length <= $visibleEnd
+                ? str_repeat($maskChar, $length)
+                : str_repeat($maskChar, $length - $visibleEnd).mb_substr($value, -$visibleEnd);
         }
 
         return $array;

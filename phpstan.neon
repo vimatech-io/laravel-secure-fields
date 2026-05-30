@@ -12,4 +12,3 @@ parameters:
         - '#Trait .+ is used zero times and is not analysed#'
         - '#Cannot cast mixed to (string|int)#'
         - '#Call to protected method getAttributeFromArray#'
-        - '#Part .+ of encapsed string cannot be cast to string#'

@@ -8,12 +8,15 @@ use Illuminate\Contracts\Database\Eloquent\CastsAttributes;
 use Illuminate\Database\Eloquent\Model;
 use VimaTech\SecureFields\Contracts\AuditLogger;
 use VimaTech\SecureFields\Contracts\Encryptor;
+use VimaTech\SecureFields\Exceptions\DecryptionException;
 
 /**
  * @implements CastsAttributes<array<string, mixed>, array<string, mixed>>
  */
 class SecureJson implements CastsAttributes
 {
+    private static ?Encryptor $encryptor = null;
+
     /**
      * @return array<string, mixed>|null
      */
@@ -23,7 +26,12 @@ class SecureJson implements CastsAttributes
             return null;
         }
 
-        $decrypted = app(Encryptor::class)->decrypt($value);
+        try {
+            $decrypted = self::encryptor()->decrypt($value);
+        } catch (DecryptionException $e) {
+            throw new DecryptionException('Decryption failed.', 0, $e);
+        }
+
         app(AuditLogger::class)->logDecryption($model, $key);
 
         /** @var array<string, mixed> */
@@ -38,6 +46,11 @@ class SecureJson implements CastsAttributes
 
         $json = json_encode($value, JSON_THROW_ON_ERROR);
 
-        return app(Encryptor::class)->encrypt($json);
+        return self::encryptor()->encrypt($json);
+    }
+
+    private static function encryptor(): Encryptor
+    {
+        return self::$encryptor ??= app(Encryptor::class);
     }
 }
