@@ -95,6 +95,33 @@ php artisan vendor:publish --tag=secure-fields-migrations
 php artisan migrate
 ```
 
+## Generating Keys
+
+> **Important:** Always generate dedicated keys. Never leave `SECURE_FIELDS_KEY` or `SECURE_FIELDS_HASH_KEY` empty — an empty value silently falls back to a key derived from `APP_KEY`, which means a compromised `APP_KEY` would expose both session/cookie encryption **and** all field-level ciphertext.
+
+Generate a 32-byte encryption key (base64-encoded):
+
+```bash
+php -r "echo base64_encode(random_bytes(32)), PHP_EOL;"
+```
+
+Generate a 32-byte hash key (hex-encoded or base64):
+
+```bash
+php -r "echo bin2hex(random_bytes(32)), PHP_EOL;"
+```
+
+Add both to your `.env`:
+
+```env
+SECURE_FIELDS_KEY=<output of first command>
+SECURE_FIELDS_HASH_KEY=<output of second command>
+```
+
+**Minimum requirements:**
+- `SECURE_FIELDS_KEY` — 32 bytes, base64-encoded (validated at boot)
+- `SECURE_FIELDS_HASH_KEY` — minimum 32 bytes/characters (validated at boot)
+
 ## Quick Start
 
 ### 1. Add encrypted fields to your model
@@ -109,9 +136,9 @@ class User extends Model
     use HasSecureFields;
 
     protected $casts = [
-        'email' => SecureField::class,
-        'phone' => SecureField::class,
-        'ssn' => SecureField::class,
+        'email'    => SecureField::class,
+        'phone'    => SecureField::class,
+        'ssn'      => SecureField::class,
         'metadata' => SecureJson::class,
     ];
 
@@ -127,17 +154,17 @@ class User extends Model
 ```php
 Schema::create('users', function (Blueprint $table) {
     $table->id();
-    $table->text('email');           // encrypted value (use TEXT, not VARCHAR)
-    $table->string('email_hash', 64); // blind index for searching
-    $table->text('phone');
-    $table->string('phone_hash', 64);
+    $table->text('email');                       // required field — not nullable
+    $table->string('email_hash', 64);            // blind index for searching
+    $table->text('phone')->nullable();           // optional field
+    $table->string('phone_hash', 64)->nullable();
     $table->text('ssn');
-    $table->text('metadata');
+    $table->text('metadata')->nullable();        // optional JSON field
     $table->timestamps();
 });
 ```
 
-> **Important:** Use `TEXT` columns for encrypted fields — encrypted payloads are larger than plaintext.
+> **Important:** Use `TEXT` columns for encrypted fields — encrypted payloads are larger than plaintext. Add `nullable()` only when the field is genuinely optional in your domain. The cast handles `null` values correctly in both cases.
 
 ### 3. Use it naturally
 
@@ -146,7 +173,7 @@ Schema::create('users', function (Blueprint $table) {
 $user = User::create([
     'email' => 'john@example.com',
     'phone' => '+1234567890',
-    'ssn' => '123-45-6789',
+    'ssn'   => '123-45-6789',
     'metadata' => ['plan' => 'premium', 'preferences' => ['dark_mode' => true]],
 ]);
 
@@ -161,7 +188,7 @@ echo $user->email; // "john@example.com"
 Search encrypted fields without exposing plaintext:
 
 ```php
-// Find by encrypted field
+// Exact-match search on encrypted field
 $user = User::secureWhere('email', 'john@example.com')->first();
 
 // Chain with other queries
@@ -178,17 +205,35 @@ The package stores a deterministic HMAC-SHA256 hash alongside the encrypted valu
 2. On search: hashes the search term and queries the hash column
 3. The hash is one-way — it cannot be reversed to obtain the plaintext
 
+### Search normalization
+
+Blind index hashes are **case-insensitive** and **whitespace-trimmed**. These three searches are equivalent and will find the same record:
+
+```php
+User::secureWhere('email', 'John@Example.COM')
+User::secureWhere('email', '  john@example.com  ')
+User::secureWhere('email', 'john@example.com')
+```
+
+This normalization is applied consistently on both write and search, so records are always findable regardless of input case.
+
 ## Field Masking
 
-Display sensitive data safely:
+Encrypted fields are **hidden by default** from `toArray()` and `toJson()` to prevent accidental exposure. `toMaskedArray()` makes them visible with masking applied:
 
 ```php
 $user->masked('phone');       // "********7890"
 $user->masked('ssn');         // "*******6789"
-$user->masked('phone', 2);   // "**********90"
+$user->masked('phone', 2);    // "**********90"
 
-// Masked array export
-$user->toMaskedArray();
+// Returns all model fields with secure fields replaced by masked values
+$user->toMaskedArray();       // ['id' => 1, 'phone' => '********7890', ...]
+```
+
+You can also mask individual fields with custom parameters:
+
+```php
+$user->masked('phone', visibleEnd: 4, maskChar: '#'); // "########7890"
 ```
 
 ## Encrypted JSON Fields
@@ -209,39 +254,109 @@ echo $user->metadata['api_key']; // "sk_live_..."
 
 ## Key Rotation
 
-Rotate encryption keys without downtime:
+Rotate encryption keys without downtime. The rotation command re-encrypts all field values with the new key while the `SECURE_FIELDS_KEY` in your `.env` already points to the new key.
+
+### Rotation workflow
+
+1. Generate a new key: `php -r "echo base64_encode(random_bytes(32)), PHP_EOL;"`
+2. Update `SECURE_FIELDS_KEY` in `.env` to the new key
+3. Run the rotation command with the **old** key
+4. Verify data integrity
+5. Remove the old key from any backups or records
+
+### Running the rotation
+
+The old key is read via a **secure interactive prompt** that does not appear in process listings or shell history:
 
 ```bash
-# Preview what will be rotated
-php artisan secure-fields:rotate "App\Models\User" --old-key=BASE64_OLD_KEY --dry-run
+# Interactive prompt (recommended — key never appears in shell history)
+php artisan secure-fields:rotate "App\Models\User"
+# > Enter the old encryption key (base64): [hidden input]
 
-# Rotate keys
+# Or pass via --old-key for automated scripts
+# WARNING: --old-key is visible in `ps aux` and shell history
 php artisan secure-fields:rotate "App\Models\User" --old-key=BASE64_OLD_KEY
 
-# Rotate specific fields with custom chunk size
+# Preview without persisting
+php artisan secure-fields:rotate "App\Models\User" --dry-run
+
+# Rotate specific fields
 php artisan secure-fields:rotate "App\Models\User" \
-    --old-key=BASE64_OLD_KEY \
     --fields=email \
     --fields=phone \
     --chunk=1000
 ```
 
-### Key rotation workflow
+> **Security note:** For automated pipelines, prefer passing the old key via an environment variable read inside a wrapper script rather than as a CLI argument:
+> ```bash
+> OLD_KEY=$(vault kv get -field=old_key secret/secure-fields)
+> php artisan secure-fields:rotate "App\Models\User" --old-key="$OLD_KEY"
+> ```
 
-1. Generate a new key: `php -r "echo base64_encode(random_bytes(32));"`
-2. Update `SECURE_FIELDS_KEY` in `.env` to the new key
-3. Run rotation command with the old key
-4. Verify data integrity
-5. Remove old key from any backups/records
+### Hash key rotation
+
+The `SECURE_FIELDS_HASH_KEY` is **separate** from the encryption key and used only for HMAC blind indexes. If you need to rotate the hash key:
+
+1. Changing `SECURE_FIELDS_HASH_KEY` will invalidate all existing blind indexes — `secureWhere()` queries will return no results for existing records until indexes are rebuilt.
+2. A `secure-fields:rehash` command for rebuilding indexes is planned for a future release.
+3. Until then, rotate the hash key only during a maintenance window where you can rebuild indexes manually.
 
 ## Serialization Protection
 
-Encrypted fields are automatically hidden from `toArray()` and `toJson()`:
+Encrypted fields are automatically hidden from `toArray()` and `toJson()` to prevent accidental exposure in API responses or logs:
 
 ```php
 $user->toArray();        // email, phone, ssn are excluded
-$user->toSecureArray();  // explicitly excludes all encrypted fields
-$user->toMaskedArray();  // includes masked versions
+$user->toSecureArray();  // same — always excludes all encrypted fields
+$user->toMaskedArray();  // includes masked versions of encrypted fields
+```
+
+## Audit Logging
+
+The package can log every field decryption event, enabling access trail for GDPR, HIPAA, and SOC 2 compliance.
+
+### Configuration
+
+```env
+SECURE_FIELDS_AUDIT=true
+SECURE_FIELDS_AUDIT_DRIVER=database   # 'database' or 'log'
+SECURE_FIELDS_AUDIT_CHANNEL=stack     # Laravel log channel (for 'log' driver)
+```
+
+### What is logged
+
+| Event | Trigger | Recorded fields |
+|---|---|---|
+| `decrypt` | Reading an encrypted attribute | model, model_id, field, user_id, action, ip_address, user_agent |
+| `key_rotation` | `secure-fields:rotate` completes | model, records_processed, user_id, action, ip_address, user_agent |
+
+### Deduplication
+
+Within a single request, the same `(model, id, field)` combination is logged **at most once**, regardless of how many times the attribute is accessed. This prevents log flooding when iterating over collections.
+
+### Database driver
+
+With `SECURE_FIELDS_AUDIT_DRIVER=database`, audit rows are **batched and written in a single INSERT** at the end of the request — not one INSERT per access. This keeps the hot path free of synchronous database writes.
+
+The audit table must be published and migrated before enabling the database driver:
+
+```bash
+php artisan vendor:publish --tag=secure-fields-migrations
+php artisan migrate
+```
+
+### FrankenPHP / Laravel Octane
+
+The `AuditLogger` is bound as `scoped()` in the service container, meaning a fresh instance is created for each request in Octane and FrankenPHP worker mode. The deduplication cache and pending batch are request-scoped and never leak between requests.
+
+### Log driver
+
+The `log` driver writes to a Laravel log channel with no additional database queries — a good default for high-throughput applications.
+
+```env
+SECURE_FIELDS_AUDIT=true
+SECURE_FIELDS_AUDIT_DRIVER=log
+SECURE_FIELDS_AUDIT_CHANNEL=daily
 ```
 
 ## Facade Usage
@@ -264,31 +379,34 @@ $matches = SecureFields::verifyHash('john@example.com', $hash); // true
 // config/secure-fields.php
 
 return [
-    // Custom encryption key (base64-encoded 32 bytes)
-    // Falls back to deriving from APP_KEY via HKDF
+    // Base64-encoded 32-byte encryption key.
+    // REQUIRED in production — see "Generating Keys" section.
+    // Falls back to HKDF derivation from APP_KEY if not set (not recommended).
     'key' => env('SECURE_FIELDS_KEY'),
 
     'cipher' => 'aes-256-gcm',
 
     'hashing' => [
-        'key' => env('SECURE_FIELDS_HASH_KEY'),
+        // Minimum 32 bytes. REQUIRED in production.
+        // Falls back to HKDF derivation from APP_KEY if not set (not recommended).
+        'key'       => env('SECURE_FIELDS_HASH_KEY'),
         'algorithm' => 'sha256',
     ],
 
     'rotation' => [
         'chunk_size' => 500,
-        'queue' => env('SECURE_FIELDS_QUEUE'),
+        'queue'      => env('SECURE_FIELDS_QUEUE'),
         'connection' => env('SECURE_FIELDS_QUEUE_CONNECTION'),
     ],
 
     'masking' => [
-        'character' => '*',
+        'character'   => '*',
         'visible_end' => 4,
     ],
 
     'audit' => [
-        'enabled' => env('SECURE_FIELDS_AUDIT', false),
-        'driver' => env('SECURE_FIELDS_AUDIT_DRIVER', 'log'), // 'database' or 'log'
+        'enabled'     => env('SECURE_FIELDS_AUDIT', false),
+        'driver'      => env('SECURE_FIELDS_AUDIT_DRIVER', 'log'), // 'database' or 'log'
         'log_channel' => env('SECURE_FIELDS_AUDIT_CHANNEL', 'stack'),
     ],
 ];
@@ -297,15 +415,16 @@ return [
 ## Environment Variables
 
 ```env
-# Optional: Custom encryption key (32 bytes, base64-encoded)
+# Encryption key — 32 bytes, base64-encoded (REQUIRED)
 SECURE_FIELDS_KEY=
 
-# Optional: Custom hash key for searchable fields
+# Hash key for blind indexes — minimum 32 bytes (REQUIRED)
 SECURE_FIELDS_HASH_KEY=
 
-# Optional: Enable audit logging
+# Audit logging
 SECURE_FIELDS_AUDIT=false
 SECURE_FIELDS_AUDIT_DRIVER=log
+SECURE_FIELDS_AUDIT_CHANNEL=stack
 ```
 
 ## Complete Example
@@ -321,9 +440,9 @@ class User extends Model
     use HasSecureFields;
 
     protected $casts = [
-        'email' => SecureField::class,
-        'phone' => SecureField::class,
-        'ssn' => SecureField::class,
+        'email'    => SecureField::class,
+        'phone'    => SecureField::class,
+        'ssn'      => SecureField::class,
         'metadata' => SecureJson::class,
     ];
 
@@ -332,22 +451,23 @@ class User extends Model
 
 // 2. Use it naturally
 $user = User::create([
-    'email' => 'john@example.com',
-    'phone' => '+1234567890',
-    'ssn' => '123-45-6789',
+    'email'    => 'john@example.com',
+    'phone'    => '+1234567890',
+    'ssn'      => '123-45-6789',
     'metadata' => ['plan' => 'premium'],
 ]);
 
-$user->email;                    // "john@example.com" (decrypted)
-$user->masked('phone');          // "********7890"
-$user->masked('ssn');            // "*******6789"
+$user->email;           // "john@example.com" (decrypted)
+$user->masked('phone'); // "********7890"
+$user->masked('ssn');   // "*******6789"
 
 // 3. Search encrypted fields
 User::secureWhere('email', 'john@example.com')->first();
+User::secureWhere('email', 'JOHN@EXAMPLE.COM')->first(); // same result — case-insensitive
 
 // 4. Serialization is safe by default
-$user->toArray();                // email, phone, ssn excluded
-$user->toMaskedArray();          // masked versions included
+$user->toArray();       // email, phone, ssn excluded
+$user->toMaskedArray(); // ['id' => 1, 'email' => '**************com', ...]
 ```
 
 ## Security Notes
@@ -357,23 +477,32 @@ $user->toMaskedArray();          // masked versions included
 - Uses **AES-256-GCM** — authenticated encryption providing confidentiality and integrity
 - Every encryption generates a **unique random 12-byte IV** — no IV reuse
 - **16-byte authentication tags** protect against tampering
-- Keys are derived via **HKDF** when using APP_KEY fallback
+- Keys are derived via **HKDF** when using the `APP_KEY` fallback (not recommended for production)
+
+### Key Management
+
+- Always set **dedicated** `SECURE_FIELDS_KEY` and `SECURE_FIELDS_HASH_KEY` values
+- The `APP_KEY` fallback couples your session/cookie security to your field encryption — a compromised `APP_KEY` exposes both
+- Store keys in a secrets manager (AWS Secrets Manager, HashiCorp Vault, etc.) rather than `.env` files for production
 
 ### Searchable Fields
 
 - Uses **HMAC-SHA256** with a separate key for blind indexes
 - Hash indexes enable **exact-match only** — no partial search, no LIKE queries
-- The hash is **deterministic** but **one-way** — cannot reverse to plaintext
+- The hash is **deterministic** but **one-way** — cannot be reversed to plaintext
 - Uses **constant-time comparison** to prevent timing attacks
+- Search values are **normalized** (lowercased, trimmed) before hashing — ensure data is stored with the same normalization
 
 ### Best Practices
 
 - Use a dedicated `SECURE_FIELDS_KEY` separate from `APP_KEY`
 - Use a dedicated `SECURE_FIELDS_HASH_KEY` for search indexes
-- Rotate keys periodically
-- Enable audit logging in production
+- Rotate encryption keys periodically
+- Enable audit logging in production (`SECURE_FIELDS_AUDIT=true`)
 - Use `TEXT` columns — encrypted data is larger than plaintext
+- Add `nullable()` only when the field is genuinely optional in your domain
 - Never log decrypted sensitive values
+- Configure `TrustProxies` middleware for accurate IP logging in audit records
 
 ## Philosophy
 
