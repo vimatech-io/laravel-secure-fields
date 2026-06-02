@@ -15,8 +15,6 @@ use VimaTech\SecureFields\Exceptions\DecryptionException;
  */
 class SecureField implements CastsAttributes
 {
-    private static ?Encryptor $encryptor = null;
-
     public function get(Model $model, string $key, mixed $value, array $attributes): ?string
     {
         if (! is_string($value)) {
@@ -24,7 +22,7 @@ class SecureField implements CastsAttributes
         }
 
         try {
-            $decrypted = self::encryptor()->decrypt($value);
+            $decrypted = app(Encryptor::class)->decrypt($value);
         } catch (DecryptionException $e) {
             throw new DecryptionException('Decryption failed.', 0, $e);
         }
@@ -40,11 +38,6 @@ class SecureField implements CastsAttributes
             return null;
         }
 
-        return self::encryptor()->encrypt((string) $value);
-    }
-
-    private static function encryptor(): Encryptor
-    {
-        return self::$encryptor ??= app(Encryptor::class);
+        return app(Encryptor::class)->encrypt((string) $value);
     }
 }

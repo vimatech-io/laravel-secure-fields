@@ -15,6 +15,8 @@ use VimaTech\SecureFields\Contracts\Encryptor;
  * - Automatic hidden serialization of encrypted fields
  * - Masked output support
  * - Secure array/JSON export
+ *
+ * @mixin \Illuminate\Database\Eloquent\Model
  */
 trait HasSecureFields
 {
@@ -59,13 +61,13 @@ trait HasSecureFields
     {
         $value = $this->getAttribute($field);
 
-        if ($value === null) {
+        if ($value === null || ! is_string($value)) {
             return null;
         }
 
         $length = mb_strlen($value);
 
-        if ($length <= $visibleEnd) {
+        if ($visibleEnd === 0 || $length <= $visibleEnd) {
             return str_repeat($maskChar, $length);
         }
 
@@ -132,16 +134,18 @@ trait HasSecureFields
         $maskChar = (string) config('secure-fields.masking.character', '*');
 
         foreach ($secureFields as $field) {
-            if (! isset($array[$field])) {
+            if (! isset($array[$field]) || ! is_string($array[$field])) {
                 continue;
             }
 
-            $value = (string) $array[$field];
+            $value = $array[$field];
             $length = mb_strlen($value);
 
-            $array[$field] = $length <= $visibleEnd
-                ? str_repeat($maskChar, $length)
-                : str_repeat($maskChar, $length - $visibleEnd).mb_substr($value, -$visibleEnd);
+            if ($visibleEnd === 0 || $length <= $visibleEnd) {
+                $array[$field] = str_repeat($maskChar, $length);
+            } else {
+                $array[$field] = str_repeat($maskChar, $length - $visibleEnd).mb_substr($value, -$visibleEnd);
+            }
         }
 
         return $array;

@@ -11,4 +11,3 @@ parameters:
     ignoreErrors:
         - '#Trait .+ is used zero times and is not analysed#'
         - '#Cannot cast mixed to (string|int)#'
-        - '#Call to protected method getAttributeFromArray#'

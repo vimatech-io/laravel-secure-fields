@@ -110,7 +110,7 @@ class RotateKeysCommand extends Command
 
                         foreach ($fields as $field) {
                             /** @var string|null $encryptedValue */
-                            $encryptedValue = $record->getAttributeFromArray($field);
+                            $encryptedValue = $record->getAttributes()[$field] ?? null;
 
                             if ($encryptedValue === null) {
                                 continue;

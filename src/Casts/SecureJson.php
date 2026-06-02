@@ -15,8 +15,6 @@ use VimaTech\SecureFields\Exceptions\DecryptionException;
  */
 class SecureJson implements CastsAttributes
 {
-    private static ?Encryptor $encryptor = null;
-
     /**
      * @return array<string, mixed>|null
      */
@@ -27,7 +25,7 @@ class SecureJson implements CastsAttributes
         }
 
         try {
-            $decrypted = self::encryptor()->decrypt($value);
+            $decrypted = app(Encryptor::class)->decrypt($value);
         } catch (DecryptionException $e) {
             throw new DecryptionException('Decryption failed.', 0, $e);
         }
@@ -46,11 +44,6 @@ class SecureJson implements CastsAttributes
 
         $json = json_encode($value, JSON_THROW_ON_ERROR);
 
-        return self::encryptor()->encrypt($json);
-    }
-
-    private static function encryptor(): Encryptor
-    {
-        return self::$encryptor ??= app(Encryptor::class);
+        return app(Encryptor::class)->encrypt($json);
     }
 }
