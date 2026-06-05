@@ -1,5 +1,6 @@
 # Laravel Secure Fields
 
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/vimatech-io/laravel-secure-fields.svg)](https://packagist.org/packages/vimatech-io/laravel-secure-fields)
 [![Tests](https://github.com/vimatech-io/laravel-secure-fields/actions/workflows/ci.yml/badge.svg)](https://github.com/vimatech-io/laravel-secure-fields/actions/workflows/ci.yml)
 [![PHPStan](https://img.shields.io/badge/PHPStan-level%20max-brightgreen.svg)](https://phpstan.org/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE.md)
@@ -71,15 +72,8 @@ They are complementary — this package is purpose-built for Eloquent model fiel
 - Laravel 11+
 - OpenSSL extension
 
-> **Note:** This package is not yet published on Packagist. For now, install it via path or VCS repository.
-
 ```bash
-# Once published:
 composer require vimatech-io/laravel-secure-fields
-
-# Or via path (local development):
-# In your project's composer.json, add:
-# "repositories": [{ "type": "path", "url": "../path-to/laravel-secure-fields" }]
 ```
 
 ### Publish config
