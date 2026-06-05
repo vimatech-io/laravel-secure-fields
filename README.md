@@ -1,6 +1,6 @@
 # Laravel Secure Fields
 
-[![Latest Version on Packagist](https://img.shields.io/packagist/v/vimatech-io/laravel-secure-fields.svg)](https://packagist.org/packages/vimatech-io/laravel-secure-fields)
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/vimatech/laravel-secure-fields.svg)](https://packagist.org/packages/vimatech/laravel-secure-fields)
 [![Tests](https://github.com/vimatech-io/laravel-secure-fields/actions/workflows/ci.yml/badge.svg)](https://github.com/vimatech-io/laravel-secure-fields/actions/workflows/ci.yml)
 [![PHPStan](https://img.shields.io/badge/PHPStan-level%20max-brightgreen.svg)](https://phpstan.org/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE.md)
@@ -69,7 +69,7 @@ They are complementary — this package is purpose-built for Eloquent model fiel
 ### Requirements
 
 - PHP 8.3+
-- Laravel 11+
+- Laravel 11, 12, or 13
 - OpenSSL extension
 
 ```bash
