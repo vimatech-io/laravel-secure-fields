@@ -1,5 +1,5 @@
 {
-    "name": "vimatech-io/laravel-secure-fields",
+    "name": "vimatech/laravel-secure-fields",
     "description": "Secure encrypted Eloquent model fields for sensitive data in Laravel applications.",
     "keywords": [
         "laravel",

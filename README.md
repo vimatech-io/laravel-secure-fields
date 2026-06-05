@@ -73,7 +73,7 @@ They are complementary — this package is purpose-built for Eloquent model fiel
 - OpenSSL extension
 
 ```bash
-composer require vimatech-io/laravel-secure-fields
+composer require vimatech/laravel-secure-fields
 ```
 
 ### Publish config
