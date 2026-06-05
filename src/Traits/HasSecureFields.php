@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace VimaTech\SecureFields\Traits;
 
+use Illuminate\Database\Eloquent\Model;
 use VimaTech\SecureFields\Casts\SecureField;
 use VimaTech\SecureFields\Casts\SecureJson;
 use VimaTech\SecureFields\Contracts\Encryptor;
@@ -16,7 +17,7 @@ use VimaTech\SecureFields\Contracts\Encryptor;
  * - Masked output support
  * - Secure array/JSON export
  *
- * @mixin \Illuminate\Database\Eloquent\Model
+ * @mixin Model
  */
 trait HasSecureFields
 {
