@@ -1,7 +1,7 @@
 # Laravel Secure Fields
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/vimatech/laravel-secure-fields.svg)](https://packagist.org/packages/vimatech/laravel-secure-fields)
-[![Tests](https://github.com/vimatech-io/laravel-secure-fields/actions/workflows/ci.yml/badge.svg)](https://github.com/vimatech-io/laravel-secure-fields/actions/workflows/ci.yml)
+[![CI](https://github.com/vimatech-io/laravel-secure-fields/actions/workflows/ci.yml/badge.svg)](https://github.com/vimatech-io/laravel-secure-fields/actions/workflows/ci.yml)
 [![PHPStan](https://img.shields.io/badge/PHPStan-level%20max-brightgreen.svg)](https://phpstan.org/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE.md)
 
@@ -556,5 +556,5 @@ The MIT License (MIT). Please see [License File](LICENSE.md) for more informatio
 
 ## Credits
 
-Built and maintained by [VimaTech](https://vimatech.io).
+Built and maintained by [Vimatech](https://vimatech.io).
 Created by [Adel Zemzemi](https://github.com/adelzemzemi).
