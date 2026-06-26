@@ -1,9 +1,9 @@
 # Laravel Secure Fields
 
-[![Latest Version on Packagist](https://img.shields.io/packagist/v/vimatech/laravel-secure-fields.svg)](https://packagist.org/packages/vimatech/laravel-secure-fields)
 [![CI](https://github.com/vimatech-io/laravel-secure-fields/actions/workflows/ci.yml/badge.svg)](https://github.com/vimatech-io/laravel-secure-fields/actions/workflows/ci.yml)
-[![PHPStan](https://img.shields.io/badge/PHPStan-level%20max-brightgreen.svg)](https://phpstan.org/)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE.md)
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/vimatech/laravel-secure-fields.svg)](https://packagist.org/packages/vimatech/laravel-secure-fields)
+[![Total Downloads](https://img.shields.io/packagist/dt/vimatech/laravel-secure-fields.svg)](https://packagist.org/packages/vimatech/laravel-secure-fields)
+[![License](https://img.shields.io/packagist/l/vimatech/laravel-secure-fields.svg)](https://packagist.org/packages/vimatech/laravel-secure-fields)
 
 **Secure encrypted Eloquent model fields for Laravel.**
 
