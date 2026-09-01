@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\DB;
+use VimaTech\SecureFields\Exceptions\SecureFieldsException;
 use VimaTech\SecureFields\Services\SecureFieldsManager;
 use VimaTech\SecureFields\Tests\Fixtures\TestUser;
 
@@ -205,4 +206,26 @@ test('facade hash and verify work', function () {
     $hash = $facade->hash('test@example.com');
     expect($facade->verifyHash('test@example.com', $hash))->toBeTrue();
     expect($facade->verifyHash('wrong@example.com', $hash))->toBeFalse();
+});
+
+test('masked refuses a negative visibleEnd instead of revealing the value', function () {
+    $user = TestUser::create(['phone' => 'FR7630001007941234567890185']);
+
+    expect(fn () => TestUser::find($user->id)->masked('phone', -2))
+        ->toThrow(SecureFieldsException::class);
+});
+
+test('toMaskedArray refuses a negative configured visible_end', function () {
+    config()->set('secure-fields.masking.visible_end', -2);
+
+    $user = TestUser::create(['phone' => 'FR7630001007941234567890185']);
+
+    expect(fn () => TestUser::find($user->id)->toMaskedArray())
+        ->toThrow(SecureFieldsException::class);
+});
+
+test('visibleEnd of zero masks the whole value', function () {
+    $user = TestUser::create(['phone' => '+1234567890']);
+
+    expect(TestUser::find($user->id)->masked('phone', 0))->toBe('***********');
 });

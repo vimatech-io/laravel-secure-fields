@@ -219,6 +219,8 @@ Encrypted fields are **hidden by default** from `toArray()` and `toJson()` to pr
 $user->masked('phone');       // "********7890"
 $user->masked('ssn');         // "*******6789"
 $user->masked('phone', 2);    // "**********90"
+$user->masked('phone', 0);    // "***********" (fully masked)
+$user->masked('phone', -2);   // throws SecureFieldsException
 
 // Returns all model fields with secure fields replaced by masked values
 $user->toMaskedArray();       // ['id' => 1, 'phone' => '********7890', ...]

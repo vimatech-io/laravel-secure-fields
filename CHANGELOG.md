@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-09-01
+
+### Fixed
+
+- Masking no longer reveals the value when `visibleEnd` is negative. `masked()` and `toMaskedArray()` now throw `SecureFieldsException` instead of shifting the visible window forward.
+
+### Changed
+
+- `masked()` and `toMaskedArray()` share a single masking implementation.
+
 ## [1.0.3] - 2026-06-26
 
 ### Changed
