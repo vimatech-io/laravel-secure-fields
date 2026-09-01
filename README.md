@@ -367,9 +367,24 @@ php artisan vendor:publish --tag=secure-fields-migrations
 php artisan migrate
 ```
 
-### FrankenPHP / Laravel Octane
+### Worker mode (Octane, FrankenPHP, Swoole, RoadRunner)
 
-The `AuditLogger` is bound as `scoped()` in the service container, meaning a fresh instance is created for each request in Octane and FrankenPHP worker mode. The deduplication cache and pending batch are request-scoped and never leak between requests.
+`AuditLogger` is bound as `scoped()`, so any runner that clears scoped bindings between
+requests — which is what Laravel Octane does — hands each request a fresh logger.
+
+**The guarantee does not rest on that.** Laravel itself clears scoped bindings in exactly one
+place, between queue jobs; the HTTP kernel never does, and neither does `Application::terminate()`.
+Under a hand-written worker script — `frankenphp_handle_request()` without Octane — the container
+keeps whatever it already resolved, and a package that relied on the binding lifetime alone would
+carry state from one request into the next.
+
+So this package resets its own per-request state instead of depending on the runner: the
+deduplication cache and the pending batch are cleared when the application terminates. Neither
+crosses a request boundary under Octane or under a bare worker loop, and the test suite exercises
+both by simulating consecutive requests with and without the scoped flush.
+
+Nothing else on the logger is request-bound: the IP address and user agent are read at the moment
+an event is recorded, never cached on the instance.
 
 ### Log driver
 

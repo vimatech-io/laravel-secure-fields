@@ -18,14 +18,10 @@ class DatabaseAuditLogger implements AuditLogger
 
     private string $channel;
 
-    private ?string $ipAddress;
-
-    private ?string $userAgent;
-
     /**
      * Tracks (model:id:field) pairs already logged in this request.
-     * Safe in FrankenPHP/Octane worker mode because this class is bound
-     * via scoped() and is recreated for each request.
+     * Cleared by flush(), which the service provider calls on termination, so
+     * the request boundary holds even where an instance outlives the request.
      *
      * @var array<string, true>
      */
@@ -43,12 +39,6 @@ class DatabaseAuditLogger implements AuditLogger
         $this->enabled = (bool) config('secure-fields.audit.enabled', false);
         $this->driver = (string) config('secure-fields.audit.driver', 'log');
         $this->channel = (string) config('secure-fields.audit.log_channel', 'stack');
-        $this->ipAddress = $this->resolveIpAddress();
-        $this->userAgent = $this->resolveUserAgent();
-
-        if ($this->enabled && $this->driver === 'database') {
-            app()->terminating(fn () => $this->flush());
-        }
     }
 
     public function __destruct()
@@ -82,8 +72,8 @@ class DatabaseAuditLogger implements AuditLogger
                 'field' => $field,
                 'user_id' => $userId,
                 'action' => 'decrypt',
-                'ip_address' => $this->ipAddress,
-                'user_agent' => $this->userAgent,
+                'ip_address' => $this->resolveIpAddress(),
+                'user_agent' => $this->resolveUserAgent(),
                 'metadata' => null,
                 'created_at' => $now,
                 'updated_at' => $now,
@@ -95,7 +85,7 @@ class DatabaseAuditLogger implements AuditLogger
                 'field' => $field,
                 'user_id' => $userId,
                 'action' => 'decrypt',
-                'ip_address' => $this->ipAddress,
+                'ip_address' => $this->resolveIpAddress(),
             ]);
         }
     }
@@ -113,27 +103,33 @@ class DatabaseAuditLogger implements AuditLogger
                 'field' => '*',
                 'user_id' => Auth::id(),
                 'action' => 'key_rotation',
-                'ip_address' => $this->ipAddress,
-                'user_agent' => $this->userAgent,
+                'ip_address' => $this->resolveIpAddress(),
+                'user_agent' => $this->resolveUserAgent(),
                 'metadata' => ['records_processed' => $recordsProcessed],
             ]);
         } else {
             Log::channel($this->channel)->info('Key rotation completed', [
                 'model' => $model,
                 'records_processed' => $recordsProcessed,
-                'ip_address' => $this->ipAddress,
+                'ip_address' => $this->resolveIpAddress(),
             ]);
         }
     }
 
-    private function flush(): void
+    /**
+     * Writes the buffered rows and ends the request for this logger. Calling it
+     * twice is a no-op: the buffer is taken before the insert, never after.
+     */
+    public function flush(): void
     {
-        if ($this->pending === []) {
+        $rows = $this->pending;
+
+        $this->pending = [];
+        $this->logged = [];
+
+        if ($rows === []) {
             return;
         }
-
-        $rows = $this->pending;
-        $this->pending = [];
 
         try {
             SecureFieldAuditLog::insert($rows);
