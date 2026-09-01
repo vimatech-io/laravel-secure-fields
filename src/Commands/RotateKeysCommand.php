@@ -8,10 +8,9 @@ use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use VimaTech\SecureFields\Casts\SecureField;
-use VimaTech\SecureFields\Casts\SecureJson;
 use VimaTech\SecureFields\Contracts\AuditLogger;
 use VimaTech\SecureFields\Contracts\Encryptor;
+use VimaTech\SecureFields\Support\SecureFieldResolver;
 use VimaTech\SecureFields\Traits\HasSecureFields;
 
 class RotateKeysCommand extends Command
@@ -176,7 +175,7 @@ class RotateKeysCommand extends Command
     {
         /** @var array<int, string> $specifiedFields */
         $specifiedFields = array_values(array_filter((array) $this->option('fields')));
-        $validFields = $this->getValidSecureFields($instance);
+        $validFields = SecureFieldResolver::resolve($instance);
 
         if (! empty($specifiedFields)) {
             $invalid = array_diff($specifiedFields, $validFields);
@@ -191,17 +190,5 @@ class RotateKeysCommand extends Command
         }
 
         return $validFields;
-    }
-
-    /**
-     * @return array<string>
-     */
-    private function getValidSecureFields(Model $instance): array
-    {
-        return array_keys(array_filter(
-            $instance->getCasts(),
-            fn (mixed $cast) => is_string($cast)
-                && (is_a($cast, SecureField::class, true) || is_a($cast, SecureJson::class, true))
-        ));
     }
 }
