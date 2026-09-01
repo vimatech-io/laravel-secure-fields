@@ -64,7 +64,7 @@ class SecureFieldsServiceProvider extends ServiceProvider
                 __DIR__.'/../../config/secure-fields.php' => config_path('secure-fields.php'),
             ], 'secure-fields-config');
 
-            $this->publishes([
+            $this->publishesMigrations([
                 __DIR__.'/../../database/migrations/' => database_path('migrations'),
             ], 'secure-fields-migrations');
 

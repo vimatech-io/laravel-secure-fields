@@ -21,6 +21,7 @@ abstract class TestCase extends BaseTestCase
         $app['config']->set('app.key', 'base64:'.base64_encode(random_bytes(32)));
         $app['config']->set('secure-fields.key', base64_encode(random_bytes(32)));
         $app['config']->set('secure-fields.hashing.key', bin2hex(random_bytes(16)));
+        $app['config']->set('database.migrations.update_date_on_publish', true);
         $app['config']->set('database.default', 'testing');
         $app['config']->set('database.connections.testing', [
             'driver' => 'sqlite',

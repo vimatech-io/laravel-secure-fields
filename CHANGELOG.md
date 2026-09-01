@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking.** `AuditLogger::logDecryption()` takes `int|string|null $userId` instead of `?int`, so applications whose users have UUID or ULID keys can be audited. Anything implementing the interface must widen that parameter.
 - The published audit migration stores `model_id` and `user_id` as `string(64)` rather than `unsignedBigInteger`, so models without auto-incrementing keys can be audited. Existing installations keep the table they migrated; alter those two columns only if you need non-integer keys.
 - Exception messages now say what to do rather than only what failed, and a decryption failure names the model and field that failed instead of reporting a bare `Decryption failed.`
+- The audit migration is published with `publishesMigrations()`, so the date in its filename is replaced with the time you publish it rather than shipping as a fixed `2024_01_01`. A fixed date sorts ahead of every migration a current application has written, which put the package's table first in the run order. This requires `migrations.update_date_on_publish` in your `config/database.php`; applications upgraded from Laravel 10 may not have that key, and without it the old fixed date is kept.
 - The audit logger no longer keeps request-bound state. The IP address and user agent are read when an event is recorded rather than cached when the logger is built, so an instance that outlives a request cannot stamp a later request's rows with the first request's address.
 - The audit logger clears its deduplication cache and pending batch on termination instead of relying on `scoped()` bindings being dropped between requests. Laravel clears those in one place only — between queue jobs — so a worker loop written without Octane kept them. `DatabaseAuditLogger::flush()` is public for that reason, and calling it twice writes nothing twice.
 - The termination hook is registered once for the lifetime of the application rather than once per logger. Laravel only clears terminating callbacks when the container is flushed, so the previous per-instance registration grew by one callback, and retained one logger, for every request a worker process served.
@@ -26,6 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `derive_keys_from_app_key` (env `SECURE_FIELDS_DERIVE_KEYS_FROM_APP_KEY`), off by default. Deriving both keys from `APP_KEY` is still supported, but it is now a choice rather than what happens when you configure nothing.
 
 ### Upgrading from 1.x
+
+**Do not re-publish the migration if you have already run it.** Publishing again now writes a
+second file, dated at the time you publish, that creates a table you already have; `migrate`
+then fails on it. Only publish the migration on an installation that has never published it.
+Nothing changes for an installation that simply upgrades without re-publishing.
 
 If both `SECURE_FIELDS_KEY` and `SECURE_FIELDS_HASH_KEY` are already set, there is nothing to do.
 
