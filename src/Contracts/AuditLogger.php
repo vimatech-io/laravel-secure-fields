@@ -11,7 +11,7 @@ interface AuditLogger
     /**
      * Log a decryption event.
      */
-    public function logDecryption(Model $model, string $field, ?int $userId = null): void;
+    public function logDecryption(Model $model, string $field, int|string|null $userId = null): void;
 
     /**
      * Log a key rotation event.

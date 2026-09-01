@@ -91,7 +91,9 @@ php artisan migrate
 
 ## Generating Keys
 
-> **Important:** Always generate dedicated keys. Never leave `SECURE_FIELDS_KEY` or `SECURE_FIELDS_HASH_KEY` empty — an empty value silently falls back to a key derived from `APP_KEY`, which means a compromised `APP_KEY` would expose both session/cookie encryption **and** all field-level ciphertext.
+> **Important:** Both keys are required. With either one missing the package refuses to encrypt rather than falling back to a key derived from `APP_KEY`, because that fallback ties your stored values to `APP_KEY`: rotating it — a routine, documented Laravel operation — would leave every encrypted value unreadable, and a compromised `APP_KEY` would expose session/cookie encryption **and** all field-level ciphertext at once.
+>
+> If you knowingly want the derivation, set `derive_keys_from_app_key` to `true`. It is never the default.
 
 Generate a 32-byte encryption key (base64-encoded):
 
@@ -113,8 +115,11 @@ SECURE_FIELDS_HASH_KEY=<output of second command>
 ```
 
 **Minimum requirements:**
-- `SECURE_FIELDS_KEY` — 32 bytes, base64-encoded (validated at boot)
-- `SECURE_FIELDS_HASH_KEY` — minimum 32 bytes/characters (validated at boot)
+- `SECURE_FIELDS_KEY` — 32 bytes, base64-encoded
+- `SECURE_FIELDS_HASH_KEY` — minimum 32 characters, used verbatim as the HMAC key
+
+Both are validated the first time the package encrypts, hashes or decrypts something —
+not at boot, so an application that never touches a secure field still starts.
 
 ## Quick Start
 
@@ -198,6 +203,8 @@ The package stores a deterministic HMAC-SHA256 hash alongside the encrypted valu
 1. On save: encrypts the value AND stores `HMAC-SHA256(plaintext)` in a `{field}_hash` column
 2. On search: hashes the search term and queries the hash column
 3. The hash is one-way — it cannot be reversed to obtain the plaintext
+
+Override `getSearchIndexColumn()` on your model if your schema names those columns differently.
 
 ### Search normalization
 
@@ -346,6 +353,11 @@ Within a single request, the same `(model, id, field)` combination is logged **a
 
 With `SECURE_FIELDS_AUDIT_DRIVER=database`, audit rows are **batched and written in a single INSERT** at the end of the request — not one INSERT per access. This keeps the hot path free of synchronous database writes.
 
+Rows are held in memory for the duration of the request and written when it terminates. If
+that write fails, the failure is reported as an `error` on the configured audit channel — it
+is never swallowed. A process killed mid-request still loses its buffered rows, so treat the
+trail as an access record rather than a transactional one.
+
 The audit table must be published and migrated before enabling the database driver:
 
 ```bash
@@ -392,6 +404,10 @@ return [
     // Falls back to HKDF derivation from APP_KEY if not set (not recommended).
     'key' => env('SECURE_FIELDS_KEY'),
 
+    // Derive both keys from APP_KEY when no dedicated key is set.
+    // Off by default: it makes every stored value depend on APP_KEY.
+    'derive_keys_from_app_key' => env('SECURE_FIELDS_DERIVE_KEYS_FROM_APP_KEY', false),
+
     'hashing' => [
         // Minimum 32 bytes. REQUIRED in production.
         // Falls back to HKDF derivation from APP_KEY if not set (not recommended).
@@ -417,8 +433,12 @@ return [
 # Encryption key — 32 bytes, base64-encoded (REQUIRED)
 SECURE_FIELDS_KEY=
 
-# Hash key for blind indexes — minimum 32 bytes (REQUIRED)
+# Hash key for blind indexes — minimum 32 characters (REQUIRED)
 SECURE_FIELDS_HASH_KEY=
+
+# Opt in to deriving both keys from APP_KEY instead of setting them.
+# Leave false unless you accept that rotating APP_KEY destroys your data.
+SECURE_FIELDS_DERIVE_KEYS_FROM_APP_KEY=false
 
 # Audit logging
 SECURE_FIELDS_AUDIT=false
@@ -476,12 +496,12 @@ $user->toMaskedArray(); // ['id' => 1, 'email' => '**************com', ...]
 - Uses **AES-256-GCM** — authenticated encryption providing confidentiality and integrity
 - Every encryption generates a **unique random 12-byte IV** — no IV reuse
 - **16-byte authentication tags** protect against tampering
-- Keys are derived via **HKDF** when using the `APP_KEY` fallback (not recommended for production)
+- Deriving keys from `APP_KEY` via **HKDF** is available but off by default, and must be opted into
 
 ### Key Management
 
 - Always set **dedicated** `SECURE_FIELDS_KEY` and `SECURE_FIELDS_HASH_KEY` values
-- The `APP_KEY` fallback couples your session/cookie security to your field encryption — a compromised `APP_KEY` exposes both
+- Deriving from `APP_KEY` couples your session/cookie security to your field encryption — a compromised `APP_KEY` exposes both, and rotating it makes every encrypted value unreadable
 - Store keys in a secrets manager (AWS Secrets Manager, HashiCorp Vault, etc.) rather than `.env` files for production
 
 ### Searchable Fields

@@ -27,7 +27,7 @@ class SecureJson implements CastsAttributes
         try {
             $decrypted = app(Encryptor::class)->decrypt($value);
         } catch (DecryptionException $e) {
-            throw new DecryptionException('Decryption failed.', 0, $e);
+            throw DecryptionException::forField($model::class, $key, $e);
         }
 
         app(AuditLogger::class)->logDecryption($model, $key);

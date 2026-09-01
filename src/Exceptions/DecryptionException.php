@@ -8,16 +8,25 @@ class DecryptionException extends SecureFieldsException
 {
     public static function invalidPayload(): self
     {
-        return new self('The encrypted payload is invalid or has been tampered with.');
+        return new self('The stored value is not a payload this package produced, or it has been altered.');
     }
 
     public static function authTagMismatch(): self
     {
-        return new self('Authentication tag verification failed. Data may have been tampered with.');
+        return new self('The stored value failed authentication. It was encrypted with a different key, or it has been altered.');
     }
 
     public static function invalidKey(): self
     {
-        return new self('The encryption key is invalid or missing.');
+        return new self('The old key given to key rotation is not valid. It must be exactly 32 bytes once base64-decoded.');
+    }
+
+    public static function forField(string $model, string $field, self $previous): self
+    {
+        return new self(
+            "Failed to decrypt [{$model}::{$field}]. The stored value was encrypted with a different key, or it has been altered.",
+            0,
+            $previous
+        );
     }
 }

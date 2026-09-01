@@ -13,9 +13,9 @@ return new class extends Migration
         Schema::create('secure_field_audit_logs', function (Blueprint $table) {
             $table->id();
             $table->string('model_type');
-            $table->unsignedBigInteger('model_id')->nullable();
+            $table->string('model_id', 64)->nullable();
             $table->string('field');
-            $table->unsignedBigInteger('user_id')->nullable();
+            $table->string('user_id', 64)->nullable();
             $table->string('action'); // decrypt, key_rotation
             $table->string('ip_address', 45)->nullable();
             $table->text('user_agent')->nullable();
