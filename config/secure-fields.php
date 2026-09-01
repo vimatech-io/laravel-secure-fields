@@ -10,10 +10,22 @@ return [
     |--------------------------------------------------------------------------
     |
     | The base64-encoded 32-byte key used for AES-256-GCM encryption.
-    | If not set, the package will derive a key from your APP_KEY.
     |
     */
     'key' => env('SECURE_FIELDS_KEY'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Key Derivation From APP_KEY
+    |--------------------------------------------------------------------------
+    |
+    | Without a dedicated key the package refuses to encrypt. Enable this to
+    | derive one from APP_KEY instead. Doing so ties every stored value to
+    | APP_KEY: rotating it, or setting a dedicated key later, leaves everything
+    | already written unreadable.
+    |
+    */
+    'derive_keys_from_app_key' => env('SECURE_FIELDS_DERIVE_KEYS_FROM_APP_KEY', false),
 
     /*
     |--------------------------------------------------------------------------
@@ -21,6 +33,7 @@ return [
     |--------------------------------------------------------------------------
     |
     | Configuration for deterministic hash indexes used in searchable fields.
+    | At least 32 characters, used verbatim as the HMAC key.
     |
     */
     'hashing' => [

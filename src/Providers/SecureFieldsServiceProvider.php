@@ -10,6 +10,7 @@ use VimaTech\SecureFields\Contracts\AuditLogger;
 use VimaTech\SecureFields\Contracts\Encryptor;
 use VimaTech\SecureFields\Contracts\HashEngine;
 use VimaTech\SecureFields\Encryption\AesGcmEncryptor;
+use VimaTech\SecureFields\Exceptions\SecureFieldsException;
 use VimaTech\SecureFields\Hashing\HmacHashEngine;
 use VimaTech\SecureFields\Services\DatabaseAuditLogger;
 use VimaTech\SecureFields\Services\SecureFieldsManager;
@@ -70,6 +71,10 @@ class SecureFieldsServiceProvider extends ServiceProvider
             return $key;
         }
 
+        if (! $this->keyDerivationEnabled()) {
+            throw SecureFieldsException::missingEncryptionKey();
+        }
+
         $derived = hash_hkdf('sha256', $this->decodeAppKey(), 32, 'secure-fields-encryption');
 
         return base64_encode($derived);
@@ -84,7 +89,16 @@ class SecureFieldsServiceProvider extends ServiceProvider
             return $key;
         }
 
+        if (! $this->keyDerivationEnabled()) {
+            throw SecureFieldsException::missingHashKey();
+        }
+
         return hash_hkdf('sha256', $this->decodeAppKey(), 32, 'secure-fields-hashing');
+    }
+
+    private function keyDerivationEnabled(): bool
+    {
+        return (bool) config('secure-fields.derive_keys_from_app_key', false);
     }
 
     private function decodeAppKey(): string

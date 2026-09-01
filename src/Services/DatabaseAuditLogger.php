@@ -56,7 +56,7 @@ class DatabaseAuditLogger implements AuditLogger
         $this->flush();
     }
 
-    public function logDecryption(Model $model, string $field, ?int $userId = null): void
+    public function logDecryption(Model $model, string $field, int|string|null $userId = null): void
     {
         if (! $this->enabled) {
             return;

@@ -14,7 +14,7 @@ class HmacHashEngine implements HashEngine
     public function __construct(string $key)
     {
         if (strlen($key) < 32) {
-            throw EncryptionException::invalidKey();
+            throw EncryptionException::invalidHashKey();
         }
 
         $this->key = $key;
