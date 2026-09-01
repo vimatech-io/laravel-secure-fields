@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.1.0] - 2026-09-01
 
+### Added
+
+- `secure-fields:rotate` is idempotent. Each value is tried against the current key first and left alone when it already reads, so an interrupted rotation resumes by re-running the same command with no state to repair.
+- `secure-fields:rotate --continue-on-error` skips values that neither key can read. Without it the command now stops at the first such value.
+
 ### Fixed
 
 - A failed audit log flush is now reported as an `error` on the configured audit channel instead of being swallowed. A trail that empties without saying so is worse than no trail.
@@ -16,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `secure-fields:rotate` stops instead of continuing when a value can be read with neither key, and writes nothing for the batch it stopped in. It previously logged the record, carried on, and returned a failure exit code at the very end. Pass `--continue-on-error` for the old behaviour.
+- `secure-fields:rotate` reports rotated and already-current counts separately, and the audit entry records the number of values actually re-encrypted rather than the number of records read.
 - The list of secure fields is resolved in one place, `Support\SecureFieldResolver`. `HasSecureFields` and `secure-fields:rotate` each carried their own copy of the rule and had already drifted apart.
 
 ## [1.0.4] - 2026-09-01
