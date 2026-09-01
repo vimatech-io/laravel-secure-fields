@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking.** `AuditLogger::logDecryption()` takes `int|string|null $userId` instead of `?int`, so applications whose users have UUID or ULID keys can be audited. Anything implementing the interface must widen that parameter.
 - The published audit migration stores `model_id` and `user_id` as `string(64)` rather than `unsignedBigInteger`, so models without auto-incrementing keys can be audited. Existing installations keep the table they migrated; alter those two columns only if you need non-integer keys.
 - Exception messages now say what to do rather than only what failed, and a decryption failure names the model and field that failed instead of reporting a bare `Decryption failed.`
+- `masked()` now defaults to the configured `masking.visible_end` and `masking.character` instead of hardcoded `4` and `*`. The config governed `toMaskedArray()` only, so half the masking API ignored it. Passing either argument explicitly still overrides the configured value.
 - A `SECURE_FIELDS_HASH_KEY` shorter than 32 characters was reported with the AES key's message, which pointed at the wrong environment variable. It now has its own.
 
 ### Added
