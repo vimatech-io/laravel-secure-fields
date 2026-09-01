@@ -47,6 +47,18 @@ class SecureFieldsServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Registered once for the lifetime of the application, not once per logger:
+        // Laravel only clears terminating callbacks when the container is flushed,
+        // so a per-instance registration would accumulate on every request served
+        // by a worker process.
+        $this->app->terminating(function () {
+            $logger = $this->app->make(AuditLogger::class);
+
+            if ($logger instanceof DatabaseAuditLogger) {
+                $logger->flush();
+            }
+        });
+
         if ($this->app->runningInConsole()) {
             $this->publishes([
                 __DIR__.'/../../config/secure-fields.php' => config_path('secure-fields.php'),
