@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `masked()` and `toMaskedArray()` share a single masking implementation.
+- `SECURITY.md` now states the stored payload format, the AES and HMAC key derivation, and the blind index formula, for forensics and manual recovery.
 
 ## [1.0.3] - 2026-06-26
 
