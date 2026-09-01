@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.1.0] - 2026-09-01
 
+### Fixed
+
+- A failed audit log flush is now reported as an `error` on the configured audit channel instead of being swallowed. A trail that empties without saying so is worse than no trail.
+- Buffered audit rows are flushed on application termination rather than only in `__destruct()`. Rows were being written after the database connection had already gone, so decryption events could be lost silently on every request.
+
 ### Changed
 
 - The list of secure fields is resolved in one place, `Support\SecureFieldResolver`. `HasSecureFields` and `secure-fields:rotate` each carried their own copy of the rule and had already drifted apart.
