@@ -45,6 +45,10 @@ class DatabaseAuditLogger implements AuditLogger
         $this->channel = (string) config('secure-fields.audit.log_channel', 'stack');
         $this->ipAddress = $this->resolveIpAddress();
         $this->userAgent = $this->resolveUserAgent();
+
+        if ($this->enabled && $this->driver === 'database') {
+            app()->terminating(fn () => $this->flush());
+        }
     }
 
     public function __destruct()
@@ -124,17 +128,30 @@ class DatabaseAuditLogger implements AuditLogger
 
     private function flush(): void
     {
-        if (empty($this->pending)) {
+        if ($this->pending === []) {
             return;
         }
 
-        try {
-            SecureFieldAuditLog::insert($this->pending);
-        } catch (\Throwable) {
-            // best-effort — audit failures must not crash the application
-        }
-
+        $rows = $this->pending;
         $this->pending = [];
+
+        try {
+            SecureFieldAuditLog::insert($rows);
+        } catch (\Throwable $e) {
+            $this->reportFlushFailure($e, count($rows));
+        }
+    }
+
+    private function reportFlushFailure(\Throwable $e, int $rows): void
+    {
+        $message = "secure-fields: audit log flush failed, {$rows} decryption events lost";
+
+        try {
+            Log::channel($this->channel)->error($message, ['exception' => $e->getMessage()]);
+        } catch (\Throwable) {
+            // __destruct can run after the log manager is gone; the loss must still be recorded
+            error_log($message.': '.$e->getMessage());
+        }
     }
 
     private function resolveIpAddress(): ?string
