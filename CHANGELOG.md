@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A failed audit log flush is now reported as an `error` on the configured audit channel instead of being swallowed. A trail that empties without saying so is worse than no trail.
 - Buffered audit rows are flushed on application termination rather than only in `__destruct()`. Rows were being written after the database connection had already gone, so decryption events could be lost silently on every request.
 
+### Removed
+
+- Config keys `cipher`, `hashing.algorithm`, `rotation.chunk_size`, `rotation.queue` and `rotation.connection`. None of them was ever read: the cipher and hash algorithm are fixed in code, the rotation chunk size comes from `--chunk`, and no queued rotation exists. If you published the config file your copy still holds them — they never drove anything, and deleting them from your copy changes no behaviour.
+
 ### Changed
 
 - `secure-fields:rotate` stops instead of continuing when a value can be read with neither key, and writes nothing for the batch it stopped in. It previously logged the record, carried on, and returned a failure exit code at the very end. Pass `--continue-on-error` for the old behaviour.
