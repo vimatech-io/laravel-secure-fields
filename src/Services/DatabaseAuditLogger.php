@@ -28,7 +28,7 @@ class DatabaseAuditLogger implements AuditLogger
     private array $logged = [];
 
     /**
-     * Pending database audit rows flushed in bulk on destruction.
+     * Pending database audit rows, written in one insert when the request ends.
      *
      * @var array<int, array<string, mixed>>
      */
