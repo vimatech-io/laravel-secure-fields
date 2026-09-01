@@ -8,15 +8,9 @@ use Illuminate\Database\Eloquent\Model;
 use VimaTech\SecureFields\Casts\SecureField;
 use VimaTech\SecureFields\Casts\SecureJson;
 use VimaTech\SecureFields\Contracts\Encryptor;
+use VimaTech\SecureFields\Exceptions\SecureFieldsException;
 
 /**
- * Provides secure field management for Eloquent models.
- *
- * Features:
- * - Automatic hidden serialization of encrypted fields
- * - Masked output support
- * - Secure array/JSON export
- *
  * @mixin Model
  */
 trait HasSecureFields
@@ -24,8 +18,6 @@ trait HasSecureFields
     use HasSearchableFields;
 
     /**
-     * Per-class cache of secure field names, computed once from $casts.
-     *
      * @var array<string, array<string>>
      */
     private static array $secureFieldsCache = [];
@@ -55,15 +47,21 @@ trait HasSecureFields
         return parent::setAttribute($key, $value);
     }
 
-    /**
-     * Get a masked version of a secure field.
-     */
     public function masked(string $field, int $visibleEnd = 4, string $maskChar = '*'): ?string
     {
         $value = $this->getAttribute($field);
 
         if ($value === null || ! is_string($value)) {
             return null;
+        }
+
+        return $this->maskSecureValue($value, $visibleEnd, $maskChar);
+    }
+
+    private function maskSecureValue(string $value, int $visibleEnd, string $maskChar): string
+    {
+        if ($visibleEnd < 0) {
+            throw new SecureFieldsException("Masking visible_end must be zero or greater, [{$visibleEnd}] given.");
         }
 
         $length = mb_strlen($value);
@@ -76,8 +74,7 @@ trait HasSecureFields
     }
 
     /**
-     * Get array of field names that are encrypted.
-     * Result is cached per class — casts are defined statically and never change at runtime.
+     * Cached per class: casts are declared statically and never change at runtime.
      *
      * @return array<string>
      */
@@ -97,8 +94,7 @@ trait HasSecureFields
     }
 
     /**
-     * Get decrypted value without triggering audit log.
-     * Internal use only — do NOT expose this via public API or use in data exports.
+     * Bypasses the audit log. Never expose through a public API or a data export.
      */
     protected function getSecureRawValue(string $field): ?string
     {
@@ -112,8 +108,6 @@ trait HasSecureFields
     }
 
     /**
-     * Convert the model to array with secure fields excluded.
-     *
      * @return array<string, mixed>
      */
     public function toSecureArray(): array
@@ -122,8 +116,6 @@ trait HasSecureFields
     }
 
     /**
-     * Convert the model to array with masked secure fields.
-     *
      * @return array<string, mixed>
      */
     public function toMaskedArray(): array
@@ -139,14 +131,7 @@ trait HasSecureFields
                 continue;
             }
 
-            $value = $array[$field];
-            $length = mb_strlen($value);
-
-            if ($visibleEnd === 0 || $length <= $visibleEnd) {
-                $array[$field] = str_repeat($maskChar, $length);
-            } else {
-                $array[$field] = str_repeat($maskChar, $length - $visibleEnd).mb_substr($value, -$visibleEnd);
-            }
+            $array[$field] = $this->maskSecureValue($array[$field], $visibleEnd, $maskChar);
         }
 
         return $array;
