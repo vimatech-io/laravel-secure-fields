@@ -229,3 +229,27 @@ test('visibleEnd of zero masks the whole value', function () {
 
     expect(TestUser::find($user->id)->masked('phone', 0))->toBe('***********');
 });
+
+test('masked honours the configured visible_end', function () {
+    config()->set('secure-fields.masking.visible_end', 2);
+
+    $user = TestUser::create(['phone' => '+1234567890']);
+
+    expect(TestUser::find($user->id)->masked('phone'))->toBe('*********90');
+});
+
+test('an explicit visibleEnd still wins over the configured one', function () {
+    config()->set('secure-fields.masking.visible_end', 2);
+
+    $user = TestUser::create(['phone' => '+1234567890']);
+
+    expect(TestUser::find($user->id)->masked('phone', 4))->toBe('*******7890');
+});
+
+test('masked honours the configured mask character', function () {
+    config()->set('secure-fields.masking.character', '#');
+
+    $user = TestUser::create(['phone' => '+1234567890']);
+
+    expect(TestUser::find($user->id)->masked('phone'))->toBe('#######7890');
+});

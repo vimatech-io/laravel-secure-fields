@@ -41,7 +41,7 @@ trait HasSecureFields
         return parent::setAttribute($key, $value);
     }
 
-    public function masked(string $field, int $visibleEnd = 4, string $maskChar = '*'): ?string
+    public function masked(string $field, ?int $visibleEnd = null, ?string $maskChar = null): ?string
     {
         $value = $this->getAttribute($field);
 
@@ -49,7 +49,21 @@ trait HasSecureFields
             return null;
         }
 
-        return $this->maskSecureValue($value, $visibleEnd, $maskChar);
+        return $this->maskSecureValue(
+            $value,
+            $visibleEnd ?? $this->configuredVisibleEnd(),
+            $maskChar ?? $this->configuredMaskCharacter()
+        );
+    }
+
+    private function configuredVisibleEnd(): int
+    {
+        return (int) config('secure-fields.masking.visible_end', 4);
+    }
+
+    private function configuredMaskCharacter(): string
+    {
+        return (string) config('secure-fields.masking.character', '*');
     }
 
     private function maskSecureValue(string $value, int $visibleEnd, string $maskChar): string
@@ -105,8 +119,8 @@ trait HasSecureFields
         $secureFields = $this->getSecureFields();
         $array = (clone $this)->makeVisible($secureFields)->toArray();
 
-        $visibleEnd = (int) config('secure-fields.masking.visible_end', 4);
-        $maskChar = (string) config('secure-fields.masking.character', '*');
+        $visibleEnd = $this->configuredVisibleEnd();
+        $maskChar = $this->configuredMaskCharacter();
 
         foreach ($secureFields as $field) {
             if (! isset($array[$field]) || ! is_string($array[$field])) {

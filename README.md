@@ -233,7 +233,9 @@ $user->masked('phone', -2);   // throws SecureFieldsException
 $user->toMaskedArray();       // ['id' => 1, 'phone' => '********7890', ...]
 ```
 
-You can also mask individual fields with custom parameters:
+Both arguments default to `masking.visible_end` and `masking.character` from the config
+file, so changing them there changes `masked()` and `toMaskedArray()` alike. Pass either
+argument to override the configured value for one call:
 
 ```php
 $user->masked('phone', visibleEnd: 4, maskChar: '#'); // "########7890"
