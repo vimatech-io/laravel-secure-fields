@@ -289,6 +289,18 @@ php artisan secure-fields:rotate "App\Models\User" \
 > php artisan secure-fields:rotate "App\Models\User" --old-key="$OLD_KEY"
 > ```
 
+### Interrupted rotations
+
+The command is idempotent. Every value is tried against the current key before the old
+one, and a value that already reads is left untouched. A run that dies halfway — timeout,
+deployment, lost connection — is resumed by running the same command again. There is no
+state to repair and no record to reconcile by hand.
+
+A value that neither key can read is corrupt. The command stops there, writes nothing for
+the batch it stopped in, and names the affected key in the application log. Repair the
+record and re-run. Pass `--continue-on-error` to rotate everything else and leave the
+unreadable values in place; the command still exits non-zero.
+
 ### Hash key rotation
 
 The `SECURE_FIELDS_HASH_KEY` is **separate** from the encryption key and used only for HMAC blind indexes. If you need to rotate the hash key:
@@ -380,19 +392,10 @@ return [
     // Falls back to HKDF derivation from APP_KEY if not set (not recommended).
     'key' => env('SECURE_FIELDS_KEY'),
 
-    'cipher' => 'aes-256-gcm',
-
     'hashing' => [
         // Minimum 32 bytes. REQUIRED in production.
         // Falls back to HKDF derivation from APP_KEY if not set (not recommended).
-        'key'       => env('SECURE_FIELDS_HASH_KEY'),
-        'algorithm' => 'sha256',
-    ],
-
-    'rotation' => [
-        'chunk_size' => 500,
-        'queue'      => env('SECURE_FIELDS_QUEUE'),
-        'connection' => env('SECURE_FIELDS_QUEUE_CONNECTION'),
+        'key' => env('SECURE_FIELDS_HASH_KEY'),
     ],
 
     'masking' => [

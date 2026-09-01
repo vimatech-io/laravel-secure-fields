@@ -17,16 +17,6 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Cipher
-    |--------------------------------------------------------------------------
-    |
-    | The cipher algorithm. Only AES-256-GCM is supported for security reasons.
-    |
-    */
-    'cipher' => 'aes-256-gcm',
-
-    /*
-    |--------------------------------------------------------------------------
     | Hashing
     |--------------------------------------------------------------------------
     |
@@ -35,21 +25,6 @@ return [
     */
     'hashing' => [
         'key' => env('SECURE_FIELDS_HASH_KEY'),
-        'algorithm' => 'sha256',
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Key Rotation
-    |--------------------------------------------------------------------------
-    |
-    | Configuration for the key rotation command.
-    |
-    */
-    'rotation' => [
-        'chunk_size' => 500,
-        'queue' => env('SECURE_FIELDS_QUEUE', null),
-        'connection' => env('SECURE_FIELDS_QUEUE_CONNECTION', null),
     ],
 
     /*
