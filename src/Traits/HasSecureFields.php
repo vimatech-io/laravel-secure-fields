@@ -5,10 +5,9 @@ declare(strict_types=1);
 namespace VimaTech\SecureFields\Traits;
 
 use Illuminate\Database\Eloquent\Model;
-use VimaTech\SecureFields\Casts\SecureField;
-use VimaTech\SecureFields\Casts\SecureJson;
 use VimaTech\SecureFields\Contracts\Encryptor;
 use VimaTech\SecureFields\Exceptions\SecureFieldsException;
+use VimaTech\SecureFields\Support\SecureFieldResolver;
 
 /**
  * @mixin Model
@@ -16,11 +15,6 @@ use VimaTech\SecureFields\Exceptions\SecureFieldsException;
 trait HasSecureFields
 {
     use HasSearchableFields;
-
-    /**
-     * @var array<string, array<string>>
-     */
-    private static array $secureFieldsCache = [];
 
     public function initializeHasSecureFields(): void
     {
@@ -74,23 +68,11 @@ trait HasSecureFields
     }
 
     /**
-     * Cached per class: casts are declared statically and never change at runtime.
-     *
      * @return array<string>
      */
     protected function getSecureFields(): array
     {
-        $class = static::class;
-
-        if (! array_key_exists($class, self::$secureFieldsCache)) {
-            self::$secureFieldsCache[$class] = array_keys(array_filter(
-                $this->getCasts(),
-                fn (string $cast) => is_a($cast, SecureField::class, true)
-                    || is_a($cast, SecureJson::class, true)
-            ));
-        }
-
-        return self::$secureFieldsCache[$class];
+        return SecureFieldResolver::resolve($this);
     }
 
     /**
