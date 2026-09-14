@@ -1,6 +1,6 @@
 {
     "name": "vimatech/laravel-secure-fields",
-    "description": "Secure encrypted Eloquent model fields for sensitive data in Laravel applications.",
+    "description": "Encrypted Eloquent fields for Laravel: AES-256-GCM, searchable blind indexes, zero-downtime key rotation, automatic masking and audit logging.",
     "keywords": [
         "laravel",
         "encryption",
