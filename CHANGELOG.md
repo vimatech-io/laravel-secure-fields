@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The messages of `SecureFieldsException::missingEncryptionKey()` and `missingHashKey()` (thrown when no dedicated key is configured), and two lines of `secure-fields:rotate` output (after a failed batch, and the count of unreadable values), change their punctuation. Behaviour, exception classes and exit codes are unchanged; only code or scripts comparing the exact text are affected.
+
 ## [2.0.0] - 2026-09-01
 
 ### Changed

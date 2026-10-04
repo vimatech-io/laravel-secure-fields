@@ -351,7 +351,7 @@ SECURE_FIELDS_AUDIT_CHANNEL=stack     # Laravel log channel (for 'log' driver)
 | `decrypt` | Reading an encrypted attribute | `model_type`, `model_id`, `field`, `user_id`, `action`, `ip_address`, `user_agent` |
 | `key_rotation` | `secure-fields:rotate` completes | `model_type`, `field` (`*`), `user_id`, `action`, `ip_address`, `user_agent`, `metadata` (`records_processed`) |
 
-These are the columns of the `secure_field_audit_logs` table. The `log` driver writes the same events to the configured channel with fewer fields (no `user_agent`). The table stores `ip_address` and `user_agent` in clear: they are personal data in their own right, and the application hosting the package must define how long they are kept.
+These are the columns of the `secure_field_audit_logs` table. The `log` driver writes the same events to the configured channel with different context keys. Both name the model class under `model` instead of `model_type`, and neither carries `user_agent`. A `decrypt` entry carries `model_id`, `field`, `user_id`, `action` and `ip_address`; a `key_rotation` entry carries only `model`, `ip_address` and `records_processed` (at the top level, not under `metadata`), without `field`, `user_id` or `action`. The table stores `ip_address` and `user_agent` in clear: they are personal data in their own right, and the application hosting the package must define how long they are kept.
 
 ### Deduplication
 
