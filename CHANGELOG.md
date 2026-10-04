@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-10-05
+
 ### Changed
 
 - The messages of `SecureFieldsException::missingEncryptionKey()` and `missingHashKey()` (thrown when no dedicated key is configured), and two lines of `secure-fields:rotate` output (after a failed batch, and the count of unreadable values), change their punctuation. Behaviour, exception classes and exit codes are unchanged; only code or scripts comparing the exact text are affected.
@@ -120,7 +122,8 @@ The hash key has no equivalent of step 2: the derived value is 32 raw bytes used
 - Pest test suite
 - GitHub Actions CI
 
-[Unreleased]: https://github.com/vimatech-io/laravel-secure-fields/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/vimatech-io/laravel-secure-fields/compare/v2.0.1...HEAD
+[2.0.1]: https://github.com/vimatech-io/laravel-secure-fields/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/vimatech-io/laravel-secure-fields/compare/v1.0.4...v2.0.0
 [1.0.4]: https://github.com/vimatech-io/laravel-secure-fields/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/vimatech-io/laravel-secure-fields/compare/v1.0.2...v1.0.3
