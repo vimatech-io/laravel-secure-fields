@@ -62,20 +62,20 @@ They are complementary: this package is purpose-built for Eloquent model fields.
 ## Use Cases
 
 - PII storage (SSN, phone, email)
-- GDPR / HIPAA compliance
-- Payment-related data
+- Encryption at rest of personal or health data, as one technical measure within your own GDPR or HIPAA programme
+- Payment-related data (not a substitute for PCI DSS scope reduction or tokenisation)
 - API keys and secrets storage
 - Healthcare records
 - Legal documents
 - Multi-tenant sensitive data
 
-## Installation
-
-### Requirements
+## Requirements
 
 - PHP 8.3+
 - Laravel 11, 12, or 13
 - OpenSSL extension
+
+## Installation
 
 ```bash
 composer require vimatech/laravel-secure-fields
@@ -228,14 +228,14 @@ This normalization is applied consistently on both write and search, so records 
 Encrypted fields are **hidden by default** from `toArray()` and `toJson()` to prevent accidental exposure. `toMaskedArray()` makes them visible with masking applied:
 
 ```php
-$user->masked('phone');       // "********7890"
+$user->masked('phone');       // "*******7890"
 $user->masked('ssn');         // "*******6789"
-$user->masked('phone', 2);    // "**********90"
+$user->masked('phone', 2);    // "*********90"
 $user->masked('phone', 0);    // "***********" (fully masked)
 $user->masked('phone', -2);   // throws SecureFieldsException
 
 // Returns all model fields with secure fields replaced by masked values
-$user->toMaskedArray();       // ['id' => 1, 'phone' => '********7890', ...]
+$user->toMaskedArray();       // ['id' => 1, 'phone' => '*******7890', ...]
 ```
 
 Both arguments default to `masking.visible_end` and `masking.character` from the config
@@ -243,7 +243,7 @@ file, so changing them there changes `masked()` and `toMaskedArray()` alike. Pas
 argument to override the configured value for one call:
 
 ```php
-$user->masked('phone', visibleEnd: 4, maskChar: '#'); // "########7890"
+$user->masked('phone', visibleEnd: 4, maskChar: '#'); // "#######7890"
 ```
 
 ## Encrypted JSON Fields
@@ -320,8 +320,7 @@ unreadable values in place; the command still exits non-zero.
 The `SECURE_FIELDS_HASH_KEY` is **separate** from the encryption key and used only for HMAC blind indexes. If you need to rotate the hash key:
 
 1. Changing `SECURE_FIELDS_HASH_KEY` will invalidate all existing blind indexes: `secureWhere()` queries will return no results for existing records until indexes are rebuilt.
-2. A `secure-fields:rehash` command for rebuilding indexes is planned for a future release.
-3. Until then, rotate the hash key only during a maintenance window where you can rebuild indexes manually.
+2. There is no command that rebuilds the indexes: a record is re-indexed when its searchable fields are re-assigned and saved, so rotate the hash key only during a maintenance window in which you can do that.
 
 ## Serialization Protection
 
@@ -335,7 +334,7 @@ $user->toMaskedArray();  // includes masked versions of encrypted fields
 
 ## Audit Logging
 
-The package can log every field decryption event, enabling access trail for GDPR, HIPAA, and SOC 2 compliance.
+The package can record when an encrypted attribute is read through its casts, giving you an access trail you can use as evidence within your own security and data-protection controls. Using this package does not by itself make an application compliant with GDPR, HIPAA, SOC 2 or any other regulation or standard.
 
 ### Configuration
 
@@ -349,8 +348,10 @@ SECURE_FIELDS_AUDIT_CHANNEL=stack     # Laravel log channel (for 'log' driver)
 
 | Event | Trigger | Recorded fields |
 |---|---|---|
-| `decrypt` | Reading an encrypted attribute | model, model_id, field, user_id, action, ip_address, user_agent |
-| `key_rotation` | `secure-fields:rotate` completes | model, records_processed, user_id, action, ip_address, user_agent |
+| `decrypt` | Reading an encrypted attribute | `model_type`, `model_id`, `field`, `user_id`, `action`, `ip_address`, `user_agent` |
+| `key_rotation` | `secure-fields:rotate` completes | `model_type`, `field` (`*`), `user_id`, `action`, `ip_address`, `user_agent`, `metadata` (`records_processed`) |
+
+These are the columns of the `secure_field_audit_logs` table. The `log` driver writes the same events to the configured channel with fewer fields (no `user_agent`). The table stores `ip_address` and `user_agent` in clear: they are personal data in their own right, and the application hosting the package must define how long they are kept.
 
 ### Deduplication
 
@@ -422,8 +423,8 @@ $matches = SecureFields::verifyHash('john@example.com', $hash); // true
 
 return [
     // Base64-encoded 32-byte encryption key.
-    // REQUIRED in production: see "Generating Keys" section.
-    // Falls back to HKDF derivation from APP_KEY if not set (not recommended).
+    // REQUIRED: see "Generating Keys" section.
+    // Without it, and without derive_keys_from_app_key, the package refuses to encrypt.
     'key' => env('SECURE_FIELDS_KEY'),
 
     // Derive both keys from APP_KEY when no dedicated key is set.
@@ -431,8 +432,8 @@ return [
     'derive_keys_from_app_key' => env('SECURE_FIELDS_DERIVE_KEYS_FROM_APP_KEY', false),
 
     'hashing' => [
-        // Minimum 32 bytes. REQUIRED in production.
-        // Falls back to HKDF derivation from APP_KEY if not set (not recommended).
+        // At least 32 characters, used verbatim as the HMAC key. REQUIRED.
+        // Without it, and without derive_keys_from_app_key, the package refuses to hash.
         'key' => env('SECURE_FIELDS_HASH_KEY'),
     ],
 
@@ -499,7 +500,7 @@ $user = User::create([
 ]);
 
 $user->email;           // "john@example.com" (decrypted)
-$user->masked('phone'); // "********7890"
+$user->masked('phone'); // "*******7890"
 $user->masked('ssn');   // "*******6789"
 
 // 3. Search encrypted fields
@@ -508,7 +509,7 @@ User::secureWhere('email', 'JOHN@EXAMPLE.COM')->first(); // same result: case-in
 
 // 4. Serialization is safe by default
 $user->toArray();       // email, phone, ssn excluded
-$user->toMaskedArray(); // ['id' => 1, 'email' => '**************com', ...]
+$user->toMaskedArray(); // ['id' => 1, 'email' => '************.com', ...]
 ```
 
 ## Security Notes
