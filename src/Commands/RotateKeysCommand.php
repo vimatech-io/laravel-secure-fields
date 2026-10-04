@@ -166,7 +166,7 @@ class RotateKeysCommand extends Command
 
         if ($aborted) {
             $this->error('Rotation stopped at a value that neither the new nor the old key can read.');
-            $this->line('Nothing was written for the batch that failed. Repair the record and re-run — rotated values are skipped on the next pass.');
+            $this->line('Nothing was written for the batch that failed. Repair the record and re-run: rotated values are skipped on the next pass.');
         } else {
             $this->info('Key rotation complete.');
         }
@@ -175,7 +175,7 @@ class RotateKeysCommand extends Command
         $this->info("Already using the current key: {$skipped}");
 
         if ($failed > 0) {
-            $this->warn("Unreadable: {$failed} — the application log names the affected keys.");
+            $this->warn("Unreadable: {$failed}. The application log names the affected keys.");
         }
 
         if ($dryRun) {

@@ -7,17 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The messages of `SecureFieldsException::missingEncryptionKey()` and `missingHashKey()` (thrown when no dedicated key is configured), and two lines of `secure-fields:rotate` output (after a failed batch, and the count of unreadable values), change their punctuation. Behaviour, exception classes and exit codes are unchanged; only code or scripts comparing the exact text are affected.
+
 ## [2.0.0] - 2026-09-01
 
 ### Changed
 
-- **Breaking.** The package refuses to encrypt or hash when no dedicated key is configured. It previously derived one from `APP_KEY` without saying so, so an application could run for months believing it had key separation while every stored value silently depended on `APP_KEY` — and rotating `APP_KEY`, a routine documented Laravel operation, made that data unreadable. Set `SECURE_FIELDS_KEY` and `SECURE_FIELDS_HASH_KEY`, or opt back into derivation with `derive_keys_from_app_key`. See *Upgrading from 1.x*.
+- **Breaking.** The package refuses to encrypt or hash when no dedicated key is configured. It previously derived one from `APP_KEY` without saying so, so an application could run for months believing it had key separation while every stored value silently depended on `APP_KEY`, and rotating `APP_KEY` (a routine, documented Laravel operation) made that data unreadable. Set `SECURE_FIELDS_KEY` and `SECURE_FIELDS_HASH_KEY`, or opt back into derivation with `derive_keys_from_app_key`. See *Upgrading from 1.x*.
 - **Breaking.** `AuditLogger::logDecryption()` takes `int|string|null $userId` instead of `?int`, so applications whose users have UUID or ULID keys can be audited. Anything implementing the interface must widen that parameter.
 - The published audit migration stores `model_id` and `user_id` as `string(64)` rather than `unsignedBigInteger`, so models without auto-incrementing keys can be audited. Existing installations keep the table they migrated; alter those two columns only if you need non-integer keys.
 - Exception messages now say what to do rather than only what failed, and a decryption failure names the model and field that failed instead of reporting a bare `Decryption failed.`
 - The audit migration is published with `publishesMigrations()`, so the date in its filename is replaced with the time you publish it rather than shipping as a fixed `2024_01_01`. A fixed date sorts ahead of every migration a current application has written, which put the package's table first in the run order. This requires `migrations.update_date_on_publish` in your `config/database.php`; applications upgraded from Laravel 10 may not have that key, and without it the old fixed date is kept.
 - The audit logger no longer keeps request-bound state. The IP address and user agent are read when an event is recorded rather than cached when the logger is built, so an instance that outlives a request cannot stamp a later request's rows with the first request's address.
-- The audit logger clears its deduplication cache and pending batch on termination instead of relying on `scoped()` bindings being dropped between requests. Laravel clears those in one place only — between queue jobs — so a worker loop written without Octane kept them. `DatabaseAuditLogger::flush()` is public for that reason, and calling it twice writes nothing twice.
+- The audit logger clears its deduplication cache and pending batch on termination instead of relying on `scoped()` bindings being dropped between requests. Laravel clears those in one place only (between queue jobs), so a worker loop written without Octane kept them. `DatabaseAuditLogger::flush()` is public for that reason, and calling it twice writes nothing twice.
 - The termination hook is registered once for the lifetime of the application rather than once per logger. Laravel only clears terminating callbacks when the container is flushed, so the previous per-instance registration grew by one callback, and retained one logger, for every request a worker process served.
 - `masked()` now defaults to the configured `masking.visible_end` and `masking.character` instead of hardcoded `4` and `*`. The config governed `toMaskedArray()` only, so half the masking API ignored it. Passing either argument explicitly still overrides the configured value.
 - A `SECURE_FIELDS_HASH_KEY` shorter than 32 characters was reported with the AES key's message, which pointed at the wrong environment variable. It now has its own.
@@ -35,7 +39,7 @@ Nothing changes for an installation that simply upgrades without re-publishing.
 
 If both `SECURE_FIELDS_KEY` and `SECURE_FIELDS_HASH_KEY` are already set, there is nothing to do.
 
-If you relied on the `APP_KEY` fallback, **do not simply set a new key** — every value you have stored was encrypted with the derived one and would become unreadable. Pick one of:
+If you relied on the `APP_KEY` fallback, **do not simply set a new key**: every value you have stored was encrypted with the derived one and would become unreadable. Pick one of:
 
 1. **Keep the derivation, explicitly.** Set `SECURE_FIELDS_DERIVE_KEYS_FROM_APP_KEY=true`. Nothing else changes, and your data stays readable. The coupling to `APP_KEY` remains: rotating `APP_KEY` still destroys the data.
 
@@ -47,7 +51,7 @@ If you relied on the `APP_KEY` fallback, **do not simply set a new key** — eve
 
    Set the result as `SECURE_FIELDS_KEY`. Existing values stay readable, and `APP_KEY` can then be rotated safely. Move to a freshly generated key afterwards with `secure-fields:rotate`.
 
-The hash key has no equivalent of step 2: the derived value is 32 raw bytes used verbatim as the HMAC key, so it cannot be written into a `.env` value. Either keep `derive_keys_from_app_key` enabled, or set a dedicated `SECURE_FIELDS_HASH_KEY` and rebuild every blind index — a different hash key invalidates all of them, and `secureWhere()` stops matching until each record is read and its searchable fields re-assigned and saved. If you want to pin the derived hash key instead, decode it inside your published config file rather than through the environment.
+The hash key has no equivalent of step 2: the derived value is 32 raw bytes used verbatim as the HMAC key, so it cannot be written into a `.env` value. Either keep `derive_keys_from_app_key` enabled, or set a dedicated `SECURE_FIELDS_HASH_KEY` and rebuild every blind index: a different hash key invalidates all of them, and `secureWhere()` stops matching until each record is read and its searchable fields re-assigned and saved. If you want to pin the derived hash key instead, decode it inside your published config file rather than through the environment.
 
 ## [1.1.0] - 2026-09-01
 
@@ -63,7 +67,7 @@ The hash key has no equivalent of step 2: the derived value is 32 raw bytes used
 
 ### Removed
 
-- Config keys `cipher`, `hashing.algorithm`, `rotation.chunk_size`, `rotation.queue` and `rotation.connection`. None of them was ever read: the cipher and hash algorithm are fixed in code, the rotation chunk size comes from `--chunk`, and no queued rotation exists. If you published the config file your copy still holds them — they never drove anything, and deleting them from your copy changes no behaviour.
+- Config keys `cipher`, `hashing.algorithm`, `rotation.chunk_size`, `rotation.queue` and `rotation.connection`. None of them was ever read: the cipher and hash algorithm are fixed in code, the rotation chunk size comes from `--chunk`, and no queued rotation exists. If you published the config file your copy still holds them. They never drove anything, and deleting them from your copy changes no behaviour.
 
 ### Changed
 
@@ -100,7 +104,7 @@ The hash key has no equivalent of step 2: the derived value is 32 raw bytes used
 
 - Rename the package to `vimatech/laravel-secure-fields` on Packagist.
 
-## [1.0.0] - 2024-01-01
+## [1.0.0] - 2026-06-05
 
 ### Added
 
@@ -115,3 +119,11 @@ The hash key has no equivalent of step 2: the derived value is 32 raw bytes used
 - PHPStan level max compliance
 - Pest test suite
 - GitHub Actions CI
+
+[Unreleased]: https://github.com/vimatech-io/laravel-secure-fields/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/vimatech-io/laravel-secure-fields/compare/v1.0.4...v2.0.0
+[1.0.4]: https://github.com/vimatech-io/laravel-secure-fields/compare/v1.0.3...v1.0.4
+[1.0.3]: https://github.com/vimatech-io/laravel-secure-fields/compare/v1.0.2...v1.0.3
+[1.0.2]: https://github.com/vimatech-io/laravel-secure-fields/compare/v1.0.1...v1.0.2
+[1.0.1]: https://github.com/vimatech-io/laravel-secure-fields/compare/v1.0.0...v1.0.1
+[1.0.0]: https://github.com/vimatech-io/laravel-secure-fields/releases/tag/v1.0.0
