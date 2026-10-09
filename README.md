@@ -62,8 +62,8 @@ They are complementary: this package is purpose-built for Eloquent model fields.
 ## Use Cases
 
 - PII storage (SSN, phone, email)
-- Encryption at rest of personal or health data, as one technical measure within your own GDPR or HIPAA programme
-- Payment-related data (not a substitute for PCI DSS scope reduction or tokenisation)
+- Encryption at rest for personal and health data
+- Payment-related data
 - API keys and secrets storage
 - Healthcare records
 - Legal documents
@@ -334,7 +334,7 @@ $user->toMaskedArray();  // includes masked versions of encrypted fields
 
 ## Audit Logging
 
-The package can record when an encrypted attribute is read through its casts, giving you an access trail you can use as evidence within your own security and data-protection controls. Using this package does not by itself make an application compliant with GDPR, HIPAA, SOC 2 or any other regulation or standard.
+The package can record when an encrypted attribute is read through its casts, giving you an access trail of who read which field, and when.
 
 ### Configuration
 
