@@ -10,7 +10,7 @@
         "encrypted-fields",
         "pii"
     ],
-    "homepage": "https://github.com/vimatech-io/laravel-secure-fields",
+    "homepage": "https://vimatech.io/open-source/",
     "support": {
         "issues": "https://github.com/vimatech-io/laravel-secure-fields/issues",
         "source": "https://github.com/vimatech-io/laravel-secure-fields",
@@ -20,7 +20,8 @@
     "authors": [
         {
             "name": "Adel Zemzemi",
-            "email": "hello@adelzemzemi.com"
+            "email": "hello@adelzemzemi.com",
+            "homepage": "https://adelzemzemi.com/"
         }
     ],
     "require": {
